@@ -1,0 +1,26 @@
+DATA:
+  USE_MOTION: True
+  SIZE: 288
+  TRAIN_JSON_PATH: "data2022/train_nlpaug.json"
+  EVAL_JSON_PATH: "data2022/val_nlpaug.json"
+  CROP_AREA: 1.6666667 ## new_w = CROP_AREA* old_w
+ 
+
+
+MODEL:
+  NAME: "dual-text-cat"
+  BERT_TYPE: "ROBERTA"
+  BERT_NAME: "roberta-large"
+  IMG_ENCODER: "efficientnet-b2"
+  car_idloss: False
+  mo_idloss: False
+  share_idloss: False
+  SAME_TEXT: True
+  MERGE_DIM: 1024
+TRAIN: 
+  BATCH_SIZE: 64
+
+TEST:
+  QUERY_JSON_PATH: "data2022/test-queries_nlpaug.json"
+  RESTORE_FROM: "checkpoints/dual_baseline_aug1.pth"
+
