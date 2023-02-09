@@ -6,6 +6,7 @@ import timm
 class ImageEncoder(nn.Module):
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
     efficientnet = timm.create_model('efficientnet_b4', pretrained=True).to(device)
+    efficientnet.classifier = nn.Identity()
     def __init__(self, image_encoder=efficientnet, context_encoder=efficientnet, 
                  motion_encoder=efficientnet, motion_line_encoder=efficientnet):
         super(ImageEncoder, self).__init__()
