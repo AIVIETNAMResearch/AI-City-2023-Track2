@@ -6,6 +6,8 @@ import gc
 from dataloader.datasets import get_train_dataloader, get_valid_dataloader
 from loss.infonce import InfoNCE
 from loss.dcl import DCL
+import logging
+logging.basicConfig(filename='log/training.log', filemode='w')
 
 def valid_fn(valid_dataloader, model, criterion, epoch, device, config):
     valid_losses = AverageMeter()
@@ -44,7 +46,7 @@ def valid_fn(valid_dataloader, model, criterion, epoch, device, config):
 
 
         if step % config.general_config.valid_print_frequency == 0 or step == (len(valid_dataloader) - 1):
-            print(f'EVAL: [{epoch+1}][{step+1}/{len(valid_dataloader)}] '
+            logging.info(f'EVAL: [{epoch+1}][{step+1}/{len(valid_dataloader)}] '
                   f'Loss: {valid_losses.val:.4f}({valid_losses.avg:.4f})')
             
 
@@ -139,7 +141,7 @@ def train_loop(train_folds, valid_folds, device, fold, model_checkpoint_path = N
                         (step + 1 in eval_steps) or \
                         (step - 1 in eval_steps):
 
-                print(f'Epoch: [{epoch+1}][{step+1}/{len(train_dataloader)}] '
+                logging.info(f'Epoch: [{epoch+1}][{step+1}/{len(train_dataloader)}] '
                             f'Loss: {train_losses.val:.4f}({train_losses.avg:.4f}) '
                             f'Grad: {grad_norm:.4f}  '
                             f'LR: {scheduler.get_lr()[0]:.8f}  ')
@@ -161,7 +163,7 @@ def train_loop(train_folds, valid_folds, device, fold, model_checkpoint_path = N
             
         elapsed = time.time() - start_time
 
-        print(f'Epoch {epoch + 1} - avg_train_loss: {train_losses.avg:.4f} '
+        logging.info(f'Epoch {epoch + 1} - avg_train_loss: {train_losses.avg:.4f} '
                     f'avg_val_loss: {valid_losses.avg:.4f} time: {elapsed:.0f}s '
                     f'Epoch {epoch + 1} - Score: {mrr_score:.4f} \n'
                     '=============================================================================\n')
