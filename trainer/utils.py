@@ -2,6 +2,8 @@ from torch.optim import AdamW
 import torch
 from models.baseline_model import VideoTextFeatureExtractor
 from transformers import get_linear_schedule_with_warmup, get_cosine_schedule_with_warmup, get_polynomial_decay_schedule_with_warmup, get_constant_schedule_with_warmup
+from torchmetrics import RetrievalMRR
+from utils.custom_lr_scheduler import LinearWarmupCosineAnnealingLR
 
 def freeze(module):
     for parameter in module.parameters():
@@ -13,6 +15,7 @@ def get_model(config, model_checkpoint_path=None):
     if model_checkpoint_path is not None:
         state = torch.load(model_checkpoint_path, map_location='cpu')
         model.load_state_dict(state['model'])
+        print(f"Load Check Point: {model_checkpoint_path} successfully!")
 
     if config.general_config.gradient_checkpointing:
         if model.base.text_model.supports_gradient_checkpointing:
@@ -93,6 +96,10 @@ def get_scheduler(optimizer, config, num_train_steps):
             power=config.scheduler.polynomial_decay_schedule_with_warmup.power,
             lr_end=config.scheduler.polynomial_decay_schedule_with_warmup.min_lr
         )
+    elif config.scheduler.scheduler_type == "linear_warmup_cosine_annealing_lr":
+        scheduler = LinearWarmupCosineAnnealingLR(optimizer, 
+                                                  warmup_epochs=config.scheduler.linear_warmup_cosine_annealing_lr.warmup_epochs,
+                                                  max_epochs=config.scheduler.linear_warmup_cosine_annealing_lr.max_epochs)
     else:
         raise ValueError(f'Unknown scheduler: {config.scheduler.scheduler_type}')
 
@@ -108,8 +115,11 @@ def sim_matrix(a, b, eps=1e-8):
     sim_mt = torch.mm(a_norm, b_norm.transpose(0, 1))
     return sim_mt
 
-def mean_reciprocal_rank(text_out, image_out):
-    sim = sim_matrix(text_out, image_out)
-    rank = torch.argsort(torch.argsort(-1*sim))[:, 0].float()
-    
-    return torch.mean(1 / (rank + 1))
+def mean_reciprocal_rank(sim_mat):
+    mrr = RetrievalMRR()
+    return mrr(
+        sim_mat.flatten(),
+        torch.eye(len(sim_mat), device=sim_mat.device).long().bool().flatten(),
+        torch.arange(len(sim_mat), device=sim_mat.device)[:, None].expand(len(sim_mat), len(sim_mat)).flatten(),
+    )
+    pass

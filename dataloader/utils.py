@@ -43,31 +43,36 @@ def bb_intersection_over_union(boxA, boxB):
     return iou
 
 def get_motion_img(data_dir, img_path_list, boxes_list, num_frames):
-    w, h, c = cv2.imread(os.path.join(data_dir, img_path_list[0][2:])).shape
-    motion_img = np.zeros((w, h, c), dtype=np.int16)
+    first = cv2.imread(os.path.join(data_dir, img_path_list[0][2:]))
+    w, h, c = first.shape
+    motion_img = first
     line_motion_img = np.zeros((w, h, c), dtype=np.int16)
     
     center_points = []
+    
+    prev_boxes = None
+    box_indices = []
+    
+    for idx, boxes in enumerate(boxes_list):
+        x, y, w, h = boxes
 
-
-    prev_box = []
-        
-    for idx, img_path in enumerate(img_path_list):
+        if prev_boxes is None:
+            prev_boxes = [x, y, x+w, y+h]
+            box_indices.append(idx)
+        else:
+            curr_boxes = [x, y, x+w, y+h]
+            
+            if bb_intersection_over_union(prev_boxes, curr_boxes) < 0.05:
+                prev_boxes = curr_boxes
+                box_indices.append(idx)
+                
+    # print("BOXLEN: ", len(box_indices))
+    for idx in box_indices:
+        img_path = img_path_list[idx]
         img = cv2.imread(os.path.join(data_dir, img_path[2:]))
         
         x, y, w, h = boxes_list[idx]
         context_img = img[y:y+h, x:x+w, :]
-
-        if len(prev_box) == 0:
-            prev_box = [x, y, x+w, y+h]
-        else:
-            curr_box = [x, y, x+w, y+h]
-            if bb_intersection_over_union(prev_box, curr_box) > 0.5:
-                continue
-            else:
-                prev_box = curr_box
-
-        x, y, w, h = boxes_list[idx]
 
         motion_img[y:y+h, x:x+w, :] = context_img
         center_points.append((int(x+ w/2),int(y + h/2)))
@@ -77,10 +82,10 @@ def get_motion_img(data_dir, img_path_list, boxes_list, num_frames):
     for point1, point2 in zip(center_points, center_points[1:]):
         cv2.line(line_motion_img, point1, point2, [255, 255, 255], 80)    
         
-    indexes = sample_frames(num_frames, len(img_path_list), sample='uniform')
+    frame_indexes = sample_frames(num_frames, len(img_path_list), sample='uniform')
     
     context_images = []
-    for idx in indexes:
+    for idx in frame_indexes:
         img = cv2.imread(os.path.join(data_dir, img_path_list[idx][2:]))
         x, y, w, h = boxes_list[idx]
         context_img = img[y:y+h, x:x+w, :]

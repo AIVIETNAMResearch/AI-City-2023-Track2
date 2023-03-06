@@ -1,30 +1,31 @@
 {
     "general_config": {
-        "data_dir": "/kaggle/input/",
+        "data_dir": "./data/AIC23_Track2_NL_Retrieval/data",
         "max_len": 64,
-        "train_batch_size": 4,
-        "valid_batch_size": 4,
+        "train_batch_size": 16,
+        "valid_batch_size": 16,
         "n_workers": 8,
         "kfolds": 5,
         "gradient_checkpointing": true,
-        "epochs": 1,
-        "n_warmup_steps": 50,
-        "gradient_accumulation_steps": 4,
-        "unscale": false,
+        "epochs": 50,
+        "n_warmup_steps": 0,
+        "gradient_accumulation_steps": 1,
+        "unscale": true,
         "evaluate_n_times_per_epoch": 1,
         "max_grad_norm": 1000,
-        "train_print_frequency": 100,
-        "valid_print_frequency": 100,
-        "loss": "DCL"
+        "train_print_frequency": 20,
+        "valid_print_frequency": 20,
+        "loss": "InfoNCE",
+        "load_checkpoint": null
     },
     "optimizer": {
         "weight_decay": 5e-5,
-        "learning_rate": 3e-6,
+        "learning_rate": 0.00003,
         "eps": 1e-8,
         "betas": [0.9, 0.999]
     },
     "scheduler": {
-        "scheduler_type": "cosine_schedule_with_warmup",
+        "scheduler_type": "linear_warmup_cosine_annealing_lr",
         "batch_scheduler": true,
         "constant_schedule_with_warmup": { "n_warmup_steps": 0 },
         "linear_schedule_with_warmup": { "n_warmup_steps": 0 },
@@ -33,6 +34,10 @@
             "n_warmup_steps": 0,
             "power": 1.0,
             "min_lr": 0.0
+        },
+        "linear_warmup_cosine_annealing_lr": {
+            "warmup_epochs": 0,
+            "max_epochs": 20
         }
     },
     "arch": {
@@ -43,7 +48,10 @@
                 "num_frames": 4,
                 "pretrained": true,
                 "time_init": "zeros",
-                "input_res": 224
+                "input_res": 224,
+                "color_classes": 8,
+                "type_classes": 6,
+                "motion_classes": 4
             },
             "text_params": {
                 "model": "distilbert-base-uncased",
@@ -51,7 +59,7 @@
                 "input": "text"
             },
             "projection": "minimal",
-            "load_checkpoint": "/kaggle/input/frozenintime-ckpt/cc-webvid2m-4f_stformer_b_16_224.pth.tar"
+            "load_checkpoint": "./checkpoint/archive/cc-webvid2m-4f_stformer_b_16_224.pth.tar"
         },
         "text_head_setting": {
             "type": "ContextualizedWeightedHead",

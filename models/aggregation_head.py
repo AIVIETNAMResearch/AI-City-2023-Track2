@@ -1,5 +1,6 @@
 import torch.nn.functional as F
 import torch.nn as nn
+import torch
 
 class FCNet(nn.Module):
     def __init__(self, dim_list, last_nonlinear=False, layer_norm=False):

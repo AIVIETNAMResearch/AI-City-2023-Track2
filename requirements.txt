@@ -1,6 +1,5 @@
-
-torch==1.13.0+cu116
-torchvision==0.14.0+cu116
+#torch==1.13.0+cu116
+#torchvision==0.14.0+cu116
 numpy~=1.21.6
 spacy~=3.4.3
 # en-core-web-sm==2.3.0
@@ -22,3 +21,4 @@ reFILE~=0.4.1
 torchmetrics~=0.9.3
 scipy~=1.7.3
 colorlog~=6.7.0
+dotwiz
