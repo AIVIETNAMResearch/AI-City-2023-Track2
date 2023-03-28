@@ -10,22 +10,23 @@ import glob
 import argparse
 import IPython
 
-from config import BASE_DIR
+#from config import BASE_DIR
+BASE_DIR = '/media/aivn2023/86c50d28-d521-419b-a569-3aab9993961f/media/ai2023/HungAn/Track2-Vehicle-Retrieval/Track2-Vehicle_Retrieval'
 
 # dataset_path = '/data/datasets/aicity2021/AIC21_Track5_NL_Retrieval'
 # data_path = '/data/datasets/aicity2021/AIC21_Track5_NL_Retrieval/new_baseline/AIC21_Track5_NL_Retrieval'
 
-dataset_path = BASE_DIR + '/data/datasets/aicity2022/Track2'
-data_path = BASE_DIR + '/data/datasets/aicity2022/Track2/mine'
+dataset_path = BASE_DIR + '/data/AIC23_Track2_NL_Retrieval/data'
+data_path = BASE_DIR + '/data/AIC23_Track2_NL_Retrieval/data'
 
 imgpath = dataset_path
 # with open("data2021/test-tracks.json") as f:
 #     tracks_test = json.load(f)
 # with open("data2021/train-tracks.json") as f:
 #     tracks_train = json.load(f)
-with open("data2022/test-tracks.json") as f:
+with open("data/AIC23_Track2_NL_Retrieval/data/test-tracks.json") as f:
     tracks_test = json.load(f)
-with open("data2022/train-tracks.json") as f:
+with open("data/AIC23_Track2_NL_Retrieval/data/train-tracks.json") as f:
     tracks_train = json.load(f)
 all_tracks = tracks_train
 for track in tracks_test:
@@ -114,6 +115,7 @@ def get_motion_map(info):
 
     words = track["frames"][0].split('/')
     bk_path = osp.join(data_path, "data/bk_map", words[-4] + '_' + words[-3] + '.jpg')
+    #print(bk_path)
     avg_img = cv2.imread(bk_path).astype(np.int)
     postions = (example[:, :, 0] == 0) & (example[:, :, 1] == 0) & (example[:, :, 2] == 0)
     example[postions] = avg_img[postions]
@@ -143,7 +145,8 @@ def get_motion_map_iou(info):
     prev_rect = None
     for cnt, i in zip(cnt_list, range_list):
         frame_path = track["frames"][i]
-        frame_path = os.path.join(imgpath, frame_path)
+        frame_path = os.path.join(imgpath, frame_path[2:])
+        #print(frame_path)
         frame = cv2.imread(frame_path)
         # box = np.array(box)
         box = np.array(track["boxes"][i])
@@ -172,6 +175,7 @@ def get_motion_map_iou(info):
         postions = (example[:, :, 0] == 0) & (example[:, :, 1] == 0) & (example[:, :, 2] == 0)
         example[postions] = avg_img[postions]
     img_name = save_mo_iou_dir + "/%s.jpg" % track_id
+    #print(img_name)
     cv2.imwrite(img_name, example)
     print(f"motion: {img_name} save done")
 
@@ -183,12 +187,12 @@ for path in paths:
     seq_list = os.listdir(osp.join(root, path))
     for seq in seq_list:
         files.append((os.path.join(root, path, seq), path[-3:] + '_' + seq))
-# # print(files)
-# produce background image
+#print(files)
+#produce background image
 # with multiprocessing.Pool(n_worker) as pool:
 #     # get_bk_map(files)
-#      for imgs in tqdm(pool.imap_unordered(get_bk_map, files)):
-#          pass
+#     for imgs in tqdm(pool.imap_unordered(get_bk_map, files)):
+#         pass
 
 all_tracks_ids = list(all_tracks.keys())
 files = []
@@ -203,6 +207,8 @@ if args.use_frame:
 else:
     # iou
     # get_motion_map_iou(files)
+    #print(files)
+
     with multiprocessing.Pool(n_worker) as pool:
         for imgs in tqdm(pool.imap_unordered(get_motion_map_iou, files)):
             pass

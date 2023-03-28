@@ -43,3 +43,56 @@ class ContextualizedWeightedHead(nn.Module):
         weight = self.head(attention_out)
         weight = F.softmax(weight / self.temperature, dim=1)
         return weight
+    
+class MeanHead(nn.Module):
+    def __init__(self, device=torch.device('cpu')):
+        super().__init__()
+
+    def forward(self, x):
+        return x.mean(dim=1)
+
+
+class TextSimWeightedHead(nn.Module):
+    def __init__(self, temperature=1., device=torch.device('cpu')):
+        super().__init__()
+        self.temperature = temperature
+
+    def forward(self, text_features):
+        norm_text_features = F.normalize(text_features, dim=-1)
+        if text_features.shape[1] > 1:
+            text_sim_mat = torch.bmm(norm_text_features, norm_text_features.transpose(1,2))
+            weight = (text_sim_mat.sum(dim=-1, keepdim=True) - 1) / (text_sim_mat.shape[-1] - 1)
+            weight = F.softmax(weight / self.temperature, dim=1)
+            weighted_text_features = text_features * weight
+        else:
+            weighted_text_features = text_features
+        
+        return weighted_text_features.mean(dim=1)
+
+    def gen_weights(self, text_features):
+        if text_features.shape[1] > 1:
+            norm_text_features = F.normalize(text_features, dim=-1)
+            text_sim_mat = torch.bmm(norm_text_features, norm_text_features.transpose(1,2))
+            weight = (text_sim_mat.sum(dim=-1, keepdim=True) - 1) / (text_sim_mat.shape[-1] - 1)
+            weight = F.softmax(weight / self.temperature, dim=1)
+        
+        return weight
+
+
+class LocalizedWeightedHead(nn.Module):
+    def __init__(self, fc_dim_list, temperature=1., device=torch.device('cpu'),
+                    layer_norm=False):
+        super().__init__()
+        self.fc = FCNet(fc_dim_list, last_nonlinear=False, layer_norm=layer_norm)
+        self.temperature = temperature
+
+    def forward(self, text_features):
+        weight = self.fc(text_features)
+        weight = F.softmax(weight / self.temperature, dim=1)
+        weighted_text_features = text_features * weight
+        return weighted_text_features.mean(dim=1)
+
+    def gen_weights(self, text_features):
+        weight = self.fc(text_features)
+        weight = F.softmax(weight / self.temperature, dim=1)
+        return weight

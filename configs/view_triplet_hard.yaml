@@ -1,8 +1,8 @@
 DATA:
   USE_MOTION: True
   SIZE: 288
-  TRAIN_JSON_PATH: "data2022/train-tracks_nlpaug.json"
-  EVAL_JSON_PATH: "data2022/val_nlpaug.json"
+  TRAIN_JSON_PATH: "data/AIC23_Track2_NL_Retrieval/data/pseudo_test_tracks_nlpaug.json"
+  EVAL_JSON_PATH: "data/AIC23_Track2_NL_Retrieval/data/val_nlpaug.json"
   CROP_AREA: 1.6666667 ## new_w = CROP_AREA* old_w
  
 
@@ -20,9 +20,9 @@ MODEL:
     NLP_VIEW_SOFT: False
     NLP_VIEW_LOSS_MARGIN: 0.
 TRAIN: 
-  BATCH_SIZE: 64
+  BATCH_SIZE: 32
 
 TEST:
-  QUERY_JSON_PATH: "data2022/test-queries_nlpaug.json"
-  RESTORE_FROM: "checkpoints/view_triplet_hard.pth"
+  QUERY_JSON_PATH: "data/AIC23_Track2_NL_Retrieval/data/test-queries_nlpaug.json"
+  RESTORE_FROM: "checkpoints/view_triplet_hard_pseudo.pth"
 

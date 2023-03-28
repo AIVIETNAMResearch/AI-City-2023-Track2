@@ -2,12 +2,12 @@
     "general_config": {
         "data_dir": "./data/AIC23_Track2_NL_Retrieval/data",
         "max_len": 64,
-        "train_batch_size": 16,
-        "valid_batch_size": 16,
+        "train_batch_size": 6,
+        "valid_batch_size": 6,
         "n_workers": 8,
         "kfolds": 5,
         "gradient_checkpointing": true,
-        "epochs": 50,
+        "epochs": 20,
         "n_warmup_steps": 0,
         "gradient_accumulation_steps": 1,
         "unscale": true,
@@ -20,7 +20,7 @@
     },
     "optimizer": {
         "weight_decay": 5e-5,
-        "learning_rate": 0.00003,
+        "learning_rate": 0.01,
         "eps": 1e-8,
         "betas": [0.9, 0.999]
     },
@@ -36,7 +36,7 @@
             "min_lr": 0.0
         },
         "linear_warmup_cosine_annealing_lr": {
-            "warmup_epochs": 0,
+            "warmup_epochs": 1,
             "max_epochs": 20
         }
     },
@@ -59,7 +59,7 @@
                 "input": "text"
             },
             "projection": "minimal",
-            "load_checkpoint": "./checkpoint/archive/cc-webvid2m-4f_stformer_b_16_224.pth.tar"
+            "load_checkpoint": "./checkpoints/archive/cc-webvid2m-4f_stformer_b_16_224.pth.tar"
         },
         "text_head_setting": {
             "type": "ContextualizedWeightedHead",

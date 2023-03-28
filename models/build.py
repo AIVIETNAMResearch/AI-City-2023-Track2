@@ -7,7 +7,8 @@ from .siamese_baseline_v2 import SiameseLocalandMotionModelBIG_Simple, SiameseLo
 from .siamese_baseline_v2 import SiameseLocalandMotionModelBIG_DualTextCat, SiameseLocalandMotionModelBIG_DualTextAdd
 from .siamese_baseline_nl import SiameseLocalandMotionModelBIG_V2_View, \
     SiameseLocalandMotionModelBIG_DualTextAdd_view, SiameseLocalandMotionModelBIG_DualTextCat_view
-
+from .siamese_baseline_v3 import SiameseLocalandMotionModelBIGV3, SiameseLocalandMotionModelBIG_DualTextCat_Multiframes, \
+    SiameseLocalandMotionModelBIG_DualTextCat_view_MultiCrops, SiameseLocalandMotionModelBIG_MultiQueries
 
 def build_model(cfg, args):
     if cfg.MODEL.NAME == "base":
@@ -26,6 +27,14 @@ def build_model(cfg, args):
         model = SiameseLocalandMotionModelBIG_V2_View(cfg.MODEL)
     elif cfg.MODEL.NAME == 'dual-text-cat-view':
         model = SiameseLocalandMotionModelBIG_DualTextCat_view(cfg.MODEL)
+    elif cfg.MODEL.NAME == 'dual-stream-vit':
+        model = SiameseLocalandMotionModelBIGV3(cfg.MODEL)
+    elif cfg.MODEL.NAME == 'dual-text-cat-multiframes':
+        model = SiameseLocalandMotionModelBIG_DualTextCat_Multiframes(cfg.MODEL)
+    elif cfg.MODEL.NAME == 'dual-text-cat-view-multi-crops':
+        model = SiameseLocalandMotionModelBIG_DualTextCat_view_MultiCrops(cfg.MODEL)
+    elif cfg.MODEL.NAME == "dual-stream-multi-queries":
+        model = SiameseLocalandMotionModelBIG_MultiQueries(cfg.MODEL)
     else:
         assert cfg.MODEL.NAME in ["base", "dual-stream", "dual-simple", "dual-stream-v2"], f"unsupported model {cfg.MODEL.NAME}"
 
@@ -41,8 +50,11 @@ def build_model(cfg, args):
         new_state_dict = OrderedDict()
         for k, v in checkpoint['state_dict'].items():
             name = k[7:]  # remove `module.`
-            new_state_dict[name] = v
-        model.load_state_dict(new_state_dict)
+            if cfg.MODEL.NAME == 'dual-text-cat-multiframes' and "vis_fc_merge" in name:
+                pass
+            else: 
+                #new_state_dict[name] = v
+                model.state_dict()[name].copy_(v)
     else:
         print(f"====> load checkpoint from default")
 

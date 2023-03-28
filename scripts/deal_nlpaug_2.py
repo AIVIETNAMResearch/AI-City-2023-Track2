@@ -23,7 +23,7 @@ matcher.add("motion-chunks", pattern)
 # train_path = 'data2021/train.json'
 # # train_path = 'data2021/val.json'
 
-path = ['data2022/train-tracks.json', 'data2022/train.json', 'data2022/val.json', 'data2022/test-queries.json']
+path = ['data/AIC23_Track2_NL_Retrieval/data/pseudo_test_tracks.json']
 
 
 def aug(train_path):

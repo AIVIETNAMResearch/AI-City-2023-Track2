@@ -8,28 +8,40 @@ _C = CN()
 
 dataset_path_2021 = '/data/datasets/aicity2021/AIC21_Track5_NL_Retrieval'
 data_path_2021 = '/data/datasets/aicity2021/AIC21_Track5_NL_Retrieval/new_baseline/AIC21_Track5_NL_Retrieval'
-save_mo_dir_2021 = osp.join(data_path_2021, "data/motion_map")
+save_mo_dir_2021 = osp.join(data_path_2021, "data/motion_map_iou")
 
-dataset_path = '/home/dat09/3.hackathon/AICityChallenger/AICITY2022_Track2_SSM/data/datasets/aicity2022/Track2'
-data_path = '/home/dat09/3.hackathon/AICityChallenger/AICITY2022_Track2_SSM/data/datasets/aicity2022/Track2'
-save_mo_dir = osp.join(data_path, "mine/data/motion_map_iou")
+dataset_path = '/media/aivn2023/86c50d28-d521-419b-a569-3aab9993961f/media/ai2023/HungAn/Track2-Vehicle-Retrieval/Track2-Vehicle_Retrieval/data/AIC23_Track2_NL_Retrieval/data'
+data_path = '/media/aivn2023/86c50d28-d521-419b-a569-3aab9993961f/media/ai2023/HungAn/Track2-Vehicle-Retrieval/Track2-Vehicle_Retrieval/data/AIC23_Track2_NL_Retrieval/data'
+save_mo_dir = osp.join(data_path, "data/motion_map_iou")
+save_heatmap_dir = osp.join(data_path, "data/motion_heatmap")
+save_clip_feats = osp.join(data_path, "clip_feats")
+
 
 # DATA process related configurations.
 _C.DATA = CN()
 _C.DATA.CITYFLOW_PATH = dataset_path
+_C.DATA.NUM_FRAMES = 8
 # _C.DATA.TRAIN_JSON_PATH = "data/train.json"
 # _C.DATA.EVAL_JSON_PATH = "data/val.json"
-_C.DATA.TRAIN_JSON_PATH = "data2022/train.json"
-_C.DATA.EVAL_JSON_PATH = "data2022/val.json"
+_C.DATA.TRAIN_JSON_PATH = "data/train.json"
+_C.DATA.EVAL_JSON_PATH = "data/val.json"
 _C.DATA.EVAL_JSON_PATH_2021 = "data2021/train-tracks.json"
 _C.DATA.SIZE = 288
+_C.DATA.FRAMES_CONCAT = False
 _C.DATA.CROP_AREA = 1. ## new_w = CROP_AREA * old_w
 # _C.DATA.TEST_TRACKS_JSON_PATH = "data/test-tracks.json"
-_C.DATA.TEST_TRACKS_JSON_PATH = "data2022/test-tracks.json"
+_C.DATA.TEST_TRACKS_JSON_PATH = "data/AIC23_Track2_NL_Retrieval/data/test-tracks.json"
 _C.DATA.TEST_OUTPUT = "logs/Test_Output"
 _C.DATA.USE_MOTION = True
 _C.DATA.MOTION_PATH = save_mo_dir
 _C.DATA.MOTION_PATH_2021 = save_mo_dir_2021
+_C.DATA.CLIP_PATH = save_clip_feats
+_C.DATA.USE_HEATMAP = False
+_C.DATA.HEATMAP_PATH = save_heatmap_dir
+_C.DATA.MULTI_FRAMES = False
+_C.DATA.TEXT_AUG = False
+_C.DATA.USE_CLIP_FEATS = False
+_C.DATA.USE_MULTI_QUERIES = False
 # _C.DATA.MOTION_PATH = "data/motion_map"
 _C.DATA.USE_OSS = False  # set True if using OSS
 _C.DATA.OSS_PATH = 's3://chenhaobo-shared'
@@ -37,14 +49,13 @@ _C.DATA.CROP_AUG = False
 _C.DATA.TEXT_AUG_SPLIT = ''
 
 
-
 # Model specific configurations.
 _C.MODEL = CN()
 
 _C.MODEL.NAME = "base" #base or dual-stream
 _C.MODEL.BERT_TYPE = "BERT"
-_C.MODEL.BERT_NAME = "bert-base-uncased"
-_C.MODEL.IMG_ENCODER = "se_resnext50_32x4d" # se_resnext50_32x4d, efficientnet-b2, efficientnet-b3
+_C.MODEL.BERT_NAME = "roberta-base"
+_C.MODEL.IMG_ENCODER = "efficientnet-b2" # "se_resnext50_32x4d" # se_resnext50_32x4d, efficientnet-b2, efficientnet-b3
 # _C.MODEL.NUM_CLASS = 2498
 _C.MODEL.NUM_CLASS = 2155  # 2155
 _C.MODEL.OUTPUT_SIZE = 1024
@@ -52,6 +63,7 @@ _C.MODEL.EMBED_DIM = 1024
 _C.MODEL.car_idloss = True
 _C.MODEL.mo_idloss = True
 _C.MODEL.share_idloss = True
+_C.MODEL.con_idloss = True
 _C.MODEL.RESNET_CHECKPOINT = osp.join(os.environ['HOME'], '.cache/torch/hub/checkpoints/resnet50-19c8e357.pth')
 
 # dual Text
@@ -89,7 +101,7 @@ _C.MODEL.MAIN_FEAT_IDX = -1
 _C.TRAIN = CN()
 _C.TRAIN.ONE_EPOCH_REPEAT = 1
 _C.TRAIN.EPOCH = 400
-_C.TRAIN.BATCH_SIZE = 64
+_C.TRAIN.BATCH_SIZE = 8
 _C.TRAIN.NUM_WORKERS = 6
 _C.TRAIN.PRINT_FREQ = 20
 _C.TRAIN.LR = CN()
@@ -106,7 +118,7 @@ _C.TRAIN.DETERMINISTIC = False
 _C.TEST = CN()
 _C.TEST.RESTORE_FROM = None
 # _C.TEST.QUERY_JSON_PATH = "data/test-queries.json"
-_C.TEST.QUERY_JSON_PATH = "data2022/test-queries.json"
+_C.TEST.QUERY_JSON_PATH = "data/test-queries.json"
 _C.TEST.BATCH_SIZE = 128
 _C.TEST.NUM_WORKERS = 6
 _C.TEST.CONTINUE = ""

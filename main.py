@@ -24,15 +24,15 @@ import random
 
 from config import get_default_config
 from models import build_model
-from utils import TqdmToLogger, Logger, AverageMeter, accuracy, ProgressMeter
-from utils import get_mrr, MgvSaveHelper, set_seed
+from utils_ import TqdmToLogger, Logger, AverageMeter, accuracy, ProgressMeter
+from utils_ import get_mrr, MgvSaveHelper, set_seed
 from datasets import CityFlowNLDataset
 from datasets import CityFlowNLInferenceDataset
 from torch.optim.lr_scheduler import _LRScheduler
 import torchvision
 import torch.nn.functional as F
 from transformers import BertTokenizer, RobertaTokenizer, RobertaModel
-from preprocessing.transforms import build_transforms, build_vanilla_transforms, build_motion_transform
+from preprocessing.transforms import build_transforms, build_vanilla_transforms, build_motion_transform, BackTranslateAug
 from optimizer.build import build_vanilla_optimizer, FreezeBackbone
 from loss import cross_entropy, CircleLoss, TripletLoss, CirclePairLoss, CosFacePairLoss
 from rerank import rerank_params_grid_search
@@ -111,7 +111,7 @@ def prepare_start():
     return args, cfg
 
 
-def evaluate_by_test_all(model, valloader, epoch, cfg, index=-1, args=None, tokenizer=None, optimizer=None):
+def evaluate_by_test_all(model, valloader, epoch, cfg, index=-1, args=None, tokenizer=None, optimizer=None, multi_frames=False):
     """ evaluate crop, motion and merge features"""
     global best_mrr_eval_by_test
     print(f"====> Test::::{valloader.dataset.name}")
@@ -122,23 +122,31 @@ def evaluate_by_test_all(model, valloader, epoch, cfg, index=-1, args=None, toke
     all_visual_embeds = [dict() for _ in range(feat_num)]
     out = [dict() for _ in range(feat_num)]
     with torch.no_grad():
-        for batch_idx, (image, motion, track_id, frames_id) in tqdm(enumerate(valloader)):
-            vis_embed_list = model.module.encode_images(image.cuda(), motion.cuda())
-            for i in range(len(track_id)):
+        if multi_frames:
+            for batch_idx, (frames, motion, image, track_id, frames_id) in tqdm(enumerate(valloader)):
+                vis_embed_list = model.module.encode_images(image.cuda(), motion.cuda(), frames.cuda())
+                for i in range(len(track_id)):
+                    for feat_idx in range(feat_num):
+                        vis_embed = vis_embed_list[feat_idx]
+                        all_visual_embeds[feat_idx][track_id[i]] = vis_embed[i, :]
+        else:
+            for batch_idx, (image, motion, track_id, frames_id) in tqdm(enumerate(valloader)):
+                vis_embed_list = model.module.encode_images(image.cuda(), motion.cuda())
+                for i in range(len(track_id)):
+                    for feat_idx in range(feat_num):
+                        vis_embed = vis_embed_list[feat_idx]
+                        if track_id[i] not in out:
+                            out[feat_idx][track_id[i]] = dict()
+                        out[feat_idx][track_id[i]][frames_id[i].item()] = vis_embed[i, :]
+            for track_id in out[-1].keys():
                 for feat_idx in range(feat_num):
-                    vis_embed = vis_embed_list[feat_idx]
-                    if track_id[i] not in out:
-                        out[feat_idx][track_id[i]] = dict()
-                    out[feat_idx][track_id[i]][frames_id[i].item()] = vis_embed[i, :]
-        for track_id in out[-1].keys():
-            for feat_idx in range(feat_num):
-                img_feat = out[feat_idx][track_id]
-                tmp = []
-                for fid in img_feat:
-                    tmp.append(img_feat[fid])
-                tmp = torch.stack(tmp)
-                tmp = torch.mean(tmp, 0)
-                all_visual_embeds[feat_idx][track_id] = tmp
+                    img_feat = out[feat_idx][track_id]
+                    tmp = []
+                    for fid in img_feat:
+                        tmp.append(img_feat[fid])
+                    tmp = torch.stack(tmp)
+                    tmp = torch.mean(tmp, 0)
+                    all_visual_embeds[feat_idx][track_id] = tmp
 
     all_lang_embeds = [dict() for _ in range(feat_num)]
     with open(cfg.DATA.EVAL_JSON_PATH) as f:
@@ -156,13 +164,28 @@ def evaluate_by_test_all(model, valloader, epoch, cfg, index=-1, args=None, toke
             tokens = tokenizer.batch_encode_plus(text, padding='longest', return_tensors='pt')
             if 'dual-text' in cfg.MODEL.NAME:
                 car_tokens = tokenizer.batch_encode_plus(car_text, padding='longest', return_tensors='pt')
-                lang_embeds_list = model.module.encode_text(tokens['input_ids'].cuda(), tokens['attention_mask'].cuda(),
-                                                            car_tokens['input_ids'].cuda(),
-                                                            car_tokens['attention_mask'].cuda())
+                if cfg.DATA.USE_MULTI_QUERIES:
+                    lang_embeds_list = model.module.encode_text(torch.unsqueeze(tokens['input_ids'].cuda(), dim=1), 
+                                                                torch.unsqueeze(tokens['attention_mask'].cuda(), dim=1),
+                                                                car_tokens['input_ids'].cuda(),
+                                                                car_tokens['attention_mask'].cuda())
+                else:
+                    lang_embeds_list = model.module.encode_text(tokens['input_ids'].cuda(), 
+                                                                tokens['attention_mask'].cuda(),
+                                                                car_tokens['input_ids'].cuda(),
+                                                                car_tokens['attention_mask'].cuda())
             else:
-                lang_embeds_list = model.module.encode_text(tokens['input_ids'].cuda(), tokens['attention_mask'].cuda())
+                if cfg.DATA.USE_MULTI_QUERIES:
+                    lang_embeds_list = model.module.encode_text(torch.unsqueeze(tokens['input_ids'].cuda(), dim=1), 
+                                                                torch.unsqueeze(tokens['attention_mask'].cuda(), dim=1))
+                else:
+                    lang_embeds_list = model.module.encode_text(tokens['input_ids'].cuda(), tokens['attention_mask'].cuda())
             for feat_idx in range(feat_num):
-                lang_embeds = lang_embeds_list[feat_idx]
+                if cfg.DATA.USE_MULTI_QUERIES:
+                    lang_embeds = lang_embeds_list[0]
+                else:
+                    lang_embeds = lang_embeds_list[feat_idx]
+
                 all_lang_embeds[feat_idx][q_id] = lang_embeds
 
     all_sim = [list() for _ in range(feat_num)]
@@ -218,7 +241,7 @@ def evaluate_by_test_all(model, valloader, epoch, cfg, index=-1, args=None, toke
         args.ossSaver.save_ckpt(checkpoint_file, epoch, model, optimizer)
 
 
-def evaluate_by_test(model, valloader, epoch, cfg, index=-1, args=None, tokenizer=None, optimizer=None):
+def evaluate_by_test(model, valloader, epoch, cfg, index=-1, args=None, tokenizer=None, optimizer=None, multi_frames=False):
     """ evaluate merge features"""
     global best_mrr_eval_by_test
     print(f"====> Test::::{valloader.dataset.name}")
@@ -240,20 +263,43 @@ def evaluate_by_test(model, valloader, epoch, cfg, index=-1, args=None, tokenize
     all_visual_embeds = dict()
     out = dict()
     with torch.no_grad():
-        for batch_idx, (image, motion, track_id, frames_id) in tqdm(enumerate(valloader)):
-            vis_embed_list = model.module.encode_images(image.cuda(), motion.cuda())
-            vis_embed = vis_embed_list[index]
-            for i in range(len(track_id)):
-                if track_id[i] not in out:
-                    out[track_id[i]] = dict()
-                out[track_id[i]][frames_id[i].item()] = vis_embed[i, :]
-        for track_id, img_feat in out.items():
-            tmp = []
-            for fid in img_feat:
-                tmp.append(img_feat[fid])
-            tmp = torch.stack(tmp)
-            tmp = torch.mean(tmp, 0)
-            all_visual_embeds[track_id] = tmp
+        if multi_frames:
+            for batch_idx, (image, motion, track_id, frames_id) in tqdm(enumerate(valloader)):
+                vis_embed_list = model.module.encode_images(image.cuda(), motion.cuda())
+                vis_embed = vis_embed_list[index]
+                for i in range(len(track_id)):
+                    all_visual_embeds[track_id[i]] = vis_embed[i, :]
+        elif cfg.DATA.USE_CLIP_FEATS:
+            for batch_idx, (image, motion, track_id, frames_id, clip_feats_text, clip_feats_vis) in tqdm(enumerate(valloader)):
+                vis_embed_list = model.module.encode_images(image.cuda(), motion.cuda(), 
+                                                            clip_feats_vis=clip_feats_vis.cuda())
+                vis_embed = vis_embed_list[index]
+                for i in range(len(track_id)):
+                    if track_id[i] not in out:
+                        out[track_id[i]] = dict()
+                    out[track_id[i]][frames_id[i].item()] = vis_embed[i, :]
+            for track_id, img_feat in out.items():
+                tmp = []
+                for fid in img_feat:
+                    tmp.append(img_feat[fid])
+                tmp = torch.stack(tmp)
+                tmp = torch.mean(tmp, 0)
+                all_visual_embeds[track_id] = tmp
+        else:
+            for batch_idx, (image, motion, track_id, frames_id) in tqdm(enumerate(valloader)):
+                vis_embed_list = model.module.encode_images(image.cuda(), motion.cuda())
+                vis_embed = vis_embed_list[index]
+                for i in range(len(track_id)):
+                    if track_id[i] not in out:
+                        out[track_id[i]] = dict()
+                    out[track_id[i]][frames_id[i].item()] = vis_embed[i, :]
+            for track_id, img_feat in out.items():
+                tmp = []
+                for fid in img_feat:
+                    tmp.append(img_feat[fid])
+                tmp = torch.stack(tmp)
+                tmp = torch.mean(tmp, 0)
+                all_visual_embeds[track_id] = tmp
 
 
     all_lang_embeds = dict()
@@ -264,6 +310,9 @@ def evaluate_by_test(model, valloader, epoch, cfg, index=-1, args=None, tokenize
         for q_id in tqdm(all_visual_embeds.keys()):
             text = queries[q_id]['nl'][:-1]
             car_text = queries[q_id]['nl'][-1:]
+            if cfg.DATA.USE_CLIP_FEATS:
+                clip_feats = torch.load(cfg.DATA.CLIP_PATH+"/%s.pth"%q_id)
+                clip_feats_text = clip_feats['text']
 
             # same dual Text
             if cfg.MODEL.SAME_TEXT:
@@ -275,8 +324,19 @@ def evaluate_by_test(model, valloader, epoch, cfg, index=-1, args=None, tokenize
                 lang_embeds_list = model.module.encode_text(tokens['input_ids'].cuda(), tokens['attention_mask'].cuda(),
                                                             car_tokens['input_ids'].cuda(),
                                                             car_tokens['attention_mask'].cuda())
+            
             else:
-                lang_embeds_list = model.module.encode_text(tokens['input_ids'].cuda(), tokens['attention_mask'].cuda())
+                if cfg.DATA.USE_CLIP_FEATS:
+
+                    lang_embeds_list = model.module.encode_text(tokens['input_ids'].cuda(), tokens['attention_mask'].cuda(),
+                                                                clip_feats_text=clip_feats_text.cuda())
+                elif cfg.DATA.USE_MULTI_QUERIES:
+                    lang_embeds_list = model.module.encode_text(torch.unsqueeze(tokens['input_ids'].cuda(), dim=1), 
+                                                                torch.unsqueeze(tokens['attention_mask'].cuda(), dim=1))
+                
+                else:
+                    lang_embeds_list = model.module.encode_text(tokens['input_ids'].cuda(), tokens['attention_mask'].cuda())
+
             lang_embeds = lang_embeds_list[index]
             all_lang_embeds[q_id] = lang_embeds
 
@@ -347,17 +407,29 @@ def main():
         transform_test = build_transforms(cfg, is_train=False)
         motion_transform = build_motion_transform(cfg, vanilla=True)
 
+    text_aug = None
+    if cfg.DATA.TEXT_AUG:
+        text_aug = BackTranslateAug()
+
+    print("Using multi frames: ", cfg.DATA.MULTI_FRAMES)
+    print("Using frames concat: ", cfg.DATA.FRAMES_CONCAT)
+    print("Using heatmap: ", cfg.DATA.USE_HEATMAP)
+    print("Using Text Aug: ", cfg.DATA.TEXT_AUG)
+
+
     args.use_cuda = True
     train_data=CityFlowNLDataset(cfg.DATA, json_path=cfg.DATA.TRAIN_JSON_PATH,
-                                 transform=transform_train, motion_transform=motion_transform)
+                                 transform=transform_train, motion_transform=motion_transform,
+                                 frames_concat=cfg.DATA.FRAMES_CONCAT, use_multi_frames=cfg.DATA.MULTI_FRAMES)
     trainloader = DataLoader(dataset=train_data, batch_size=cfg.TRAIN.BATCH_SIZE, shuffle=True,
                              num_workers=cfg.TRAIN.NUM_WORKERS, pin_memory=True, drop_last=True)
     # val_data = CityFlowNLDataset(cfg.DATA, json_path=cfg.DATA.EVAL_JSON_PATH, transform=transform_test, Random=False)
     # valloader = DataLoader(dataset=val_data, batch_size=cfg.TRAIN.BATCH_SIZE * 10, shuffle=False,
     #                        num_workers=cfg.TRAIN.NUM_WORKERS, pin_memory=True, )
-    val_data_test = CityFlowNLInferenceDataset(cfg.DATA, transform=transform_test, val=True)
+    val_data_test = CityFlowNLInferenceDataset(cfg.DATA, transform=transform_test, val=True,
+                                               frames_concat=cfg.DATA.FRAMES_CONCAT, use_multi_frames=cfg.DATA.MULTI_FRAMES)
     valloader = DataLoader(dataset=val_data_test, batch_size=cfg.TRAIN.BATCH_SIZE, shuffle=False,
-                            num_workers=cfg.TRAIN.NUM_WORKERS, pin_memory=True, )
+                            num_workers=cfg.TRAIN.NUM_WORKERS, pin_memory=True)
 
     if cfg.MODEL.NUM_CLASS == 0:
         cfg.MODEL.NUM_CLASS = len(train_data)
@@ -379,7 +451,7 @@ def main():
 
     args.feat_idx = cfg.MODEL.MAIN_FEAT_IDX
     if args.eval_only:
-        evaluate_by_test_all(model, valloader, 0, cfg, args.feat_idx, args, tokenizer, optimizer)
+        evaluate_by_test_all(model, valloader, 0, cfg, args.feat_idx, args, tokenizer, optimizer, multi_frames=cfg.DATA.MULTI_FRAMES)
 
         # if cfg.EVAL.ON2021:
         #     val_data_2021 = CityFlowNLInferenceDataset(cfg.DATA, transform=transform_test, val=True)
@@ -411,7 +483,7 @@ def main():
     model_freeze.start_freeze_backbone()
     for epoch in range(cfg.TRAIN.EPOCH):
         if cfg.EVAL.EVAL_BY_TEST and (epoch + 1) % (cfg.EVAL.EPOCH * cfg.EVAL.EVAL_BY_TEST_NUM) == 0:
-            evaluate_by_test(model, valloader, epoch, cfg, args.feat_idx, args, tokenizer, optimizer)
+            evaluate_by_test(model, valloader, epoch, cfg, args.feat_idx, args, tokenizer, optimizer, cfg.DATA.MULTI_FRAMES)
 
         model.train()
         batch_time = AverageMeter('Time', ':6.3f')
@@ -433,14 +505,34 @@ def main():
         for tmp in range(cfg.TRAIN.ONE_EPOCH_REPEAT):
             model_freeze.on_train_epoch_start(epoch=epoch * cfg.TRAIN.ONE_EPOCH_REPEAT + tmp)
             for batch_idx, batch in enumerate(trainloader):
+ 
                 image, text, car_text, view_text = batch["crop_data"], batch["text"], batch["car_text"], batch["view_text"]
+
+                if cfg.DATA.USE_CLIP_FEATS:
+                    clip_feats_text, clip_feats_vis = batch['clip_feats_text'], batch['clip_feats_vis']
+
                 id_car, cam_id = batch["tmp_index"], batch["camera_id"]
 
                 # same dual Text
                 if cfg.MODEL.SAME_TEXT:
                     car_text = text
 
-                tokens = tokenizer.batch_encode_plus(text, padding='longest', return_tensors='pt')
+                if cfg.DATA.USE_MULTI_QUERIES:
+                    all_input_ids = []
+                    all_attn_masks = []
+                    
+                    #print(len(text), "BEFORE")
+                    text = np.array(text).transpose(1, 0)
+                    #print(len(text), "AFTER")
+                    for txt in text:
+                        txt_tokens = tokenizer.batch_encode_plus(txt, padding='longest', return_tensors='pt')
+                        all_input_ids.append(txt_tokens['input_ids'].cuda())
+                        all_attn_masks.append(txt_tokens['attention_mask'].cuda())
+                    #print(len(all_attn_masks), "ATTN MASK")
+                    #print(len(all_input_ids), "INPUT_IDS")
+                else:
+                    tokens = tokenizer.batch_encode_plus(text, padding='longest', return_tensors='pt')
+                
                 data_time.update(time.time() - end)
                 global_step += 1
                 optimizer.zero_grad()
@@ -456,7 +548,6 @@ def main():
                                             view_tokens['input_ids'].cuda(), view_tokens['attention_mask'].cuda(),
                                             image.cuda(), bk.cuda(), targets=id_car.long().cuda())
                         else:
-                            # with out nlp view
                             outputs = model(tokens['input_ids'].cuda(), tokens['attention_mask'].cuda(),
                                             car_tokens['input_ids'].cuda(), car_tokens['attention_mask'].cuda(),
                                             image.cuda(), bk.cuda(), targets=id_car.long().cuda())
@@ -464,12 +555,22 @@ def main():
                         # without dual text
                         if 'view' in cfg.MODEL.NAME:
                             view_tokens = tokenizer.batch_encode_plus(view_text, padding='longest', return_tensors='pt')
+
+
                             outputs = model(tokens['input_ids'].cuda(), tokens['attention_mask'].cuda(),
-                                            view_tokens['input_ids'].cuda(), view_tokens['attention_mask'].cuda(),
-                                            image.cuda(), bk.cuda(), targets=id_car.long().cuda())
+                                        view_tokens['input_ids'].cuda(), view_tokens['attention_mask'].cuda(),
+                                        image.cuda(), bk.cuda(), targets=id_car.long().cuda())
                         else:
-                            outputs = model(tokens['input_ids'].cuda(), tokens['attention_mask'].cuda(),
+                            if cfg.DATA.USE_CLIP_FEATS:
+                                outputs = model(tokens['input_ids'].cuda(), tokens['attention_mask'].cuda(),
+                                                image.cuda(), bk.cuda(), targets=id_car.long().cuda(),
+                                                clip_feats_text=clip_feats_text, clip_feats_vis=clip_feats_vis)
+                            elif cfg.DATA.USE_MULTI_QUERIES:
+                                outputs = model(all_input_ids, all_attn_masks,
                                             image.cuda(), bk.cuda(), targets=id_car.long().cuda())
+                            else:
+                                outputs = model(tokens['input_ids'].cuda(), tokens['attention_mask'].cuda(),
+                                                image.cuda(), bk.cuda(), targets=id_car.long().cuda())
                 else:
                     # without motion
                     outputs = model(tokens['input_ids'].cuda(), tokens['attention_mask'].cuda(),
@@ -573,7 +674,7 @@ def main():
 
     del train_data, trainloader
 
-    evaluate_by_test_all(model, valloader, cfg.TRAIN.EPOCH, cfg, args.feat_idx, args, tokenizer, optimizer)
+    evaluate_by_test_all(model, valloader, cfg.TRAIN.EPOCH, cfg, args.feat_idx, args, tokenizer, optimizer, multi_frames=cfg.DATA.MULTI_FRAMES)
 
     # if cfg.EVAL.ON2021:
     #     val_data_2021 = CityFlowNLDataset(cfg.DATA, json_path=cfg.DATA.EVAL_JSON_PATH_2021,

@@ -155,12 +155,21 @@ class SiameseLocalandMotionModelBIG(torch.nn.Module):
         if self.model_cfg.share_idloss:  
             self.id_cls3 = nn.Sequential(nn.Linear(embed_dim, embed_dim),nn.BatchNorm1d(embed_dim), nn.ReLU(),nn.Linear(embed_dim, self.model_cfg.NUM_CLASS))
 
-    def encode_text(self, nl_input_ids, nl_attention_mask):
+        self.clip_feats_fc_text = nn.Sequential(nn.Linear(embed_dim, embed_dim),nn.LayerNorm(embed_dim), nn.ReLU(),nn.Linear(embed_dim, embed_dim))
+        self.clip_feats_fc_vis = nn.Sequential(nn.Linear(embed_dim, embed_dim),nn.LayerNorm(embed_dim), nn.ReLU(),nn.Linear(embed_dim, embed_dim))
+
+    def encode_text(self, nl_input_ids, nl_attention_mask, clip_feats_text=None):
         outputs = self.bert_model(nl_input_ids,
                                   attention_mask=nl_attention_mask)
         lang_embeds = torch.mean(outputs.last_hidden_state, dim=1)
         lang_embeds = self.domian_lang_fc(lang_embeds)
+        if clip_feats_text is not None:
+            #print(torch.squeeze(clip_feats_text).shape)
+            clip_feats_text = self.clip_feats_fc_text(torch.squeeze(clip_feats_text))
+            lang_embeds = torch.add(lang_embeds, clip_feats_text)
+
         lang_car_embeds = self.lang_car_fc(lang_embeds)
+
         lang_mo_embeds = self.lang_motion_fc(lang_embeds)
         # lang_embeds = F.normalize(lang_embeds, p=2, dim=-1)
 
@@ -170,12 +179,19 @@ class SiameseLocalandMotionModelBIG(torch.nn.Module):
 
         return [lang_car_embeds, lang_mo_embeds, lang_merge_embeds]
 
-    def encode_images(self, crops, motion):
+    def encode_images(self, crops, motion, clip_feats_vis=None):
         visual_embeds = self.domian_vis_fc(self.vis_backbone(crops))
         visual_embeds = visual_embeds.view(visual_embeds.size(0), -1)
+        if clip_feats_vis is not None:
+            #print(torch.squeeze(clip_feats_vis).shape)
+            clip_feats_vis = self.clip_feats_fc_vis(torch.squeeze(clip_feats_vis))
+            visual_embeds = torch.add(visual_embeds, clip_feats_vis)
+
         motion_embeds = self.domian_vis_fc_bk(self.vis_backbone_bk(motion))
         motion_embeds = motion_embeds.view(motion_embeds.size(0), -1)
         visual_car_embeds = self.vis_car_fc(visual_embeds)
+
+        
         visual_mo_embeds = self.vis_motion_fc(motion_embeds)
         visual_merge_embeds = self.domian_vis_fc_merge(torch.cat([visual_car_embeds, visual_mo_embeds], dim=-1))
         # visual_embeds = F.normalize(visual_merge_embeds, p=2, dim=-1)
@@ -186,16 +202,30 @@ class SiameseLocalandMotionModelBIG(torch.nn.Module):
 
         return [visual_car_embeds, visual_mo_embeds, visual_merge_embeds]
 
-    def forward(self, nl_input_ids, nl_attention_mask, crops, motion, targets=None):
+    def forward(self, nl_input_ids, nl_attention_mask, crops, motion, targets=None, clip_feats_text=None, clip_feats_vis=None):
 
         outputs = self.bert_model(nl_input_ids,attention_mask=nl_attention_mask)
         lang_embeds = torch.mean(outputs.last_hidden_state, dim=1)
         lang_embeds = self.domian_lang_fc(lang_embeds)
         visual_embeds = self.domian_vis_fc(self.vis_backbone(crops))
         visual_embeds = visual_embeds.view(visual_embeds.size(0), -1)
+
+        if clip_feats_vis is not None:
+            #print(torch.squeeze(clip_feats_vis).shape)
+            clip_feats_vis = self.clip_feats_fc_vis(torch.squeeze(clip_feats_vis))
+            visual_embeds = torch.add(visual_embeds, clip_feats_vis)
+
+        if clip_feats_text is not None:
+            #print(torch.squeeze(clip_feats_text).shape)
+            clip_feats_text = self.clip_feats_fc_text(torch.squeeze(clip_feats_text))
+            lang_embeds = torch.add(lang_embeds, clip_feats_text)
+
         motion_embeds = self.domian_vis_fc_bk(self.vis_backbone_bk(motion))
         motion_embeds = motion_embeds.view(motion_embeds.size(0), -1)        
         visual_car_embeds = self.vis_car_fc(visual_embeds)
+
+
+
         visual_mo_embeds = self.vis_motion_fc(motion_embeds)
         visual_merge_embeds = self.domian_vis_fc_merge(torch.cat([visual_car_embeds,visual_mo_embeds],dim=-1))
         cls_logits_results = []
@@ -207,6 +237,8 @@ class SiameseLocalandMotionModelBIG(torch.nn.Module):
             cls_logits_results.append(cls_logits2)
         lang_car_embeds = self.lang_car_fc(lang_embeds)
         lang_mo_embeds = self.lang_motion_fc(lang_embeds)
+
+
         if self.model_cfg.share_idloss:  
             merge_cls_t = self.id_cls3(lang_embeds)
             merge_cls_v = self.id_cls3(visual_merge_embeds)

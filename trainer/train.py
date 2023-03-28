@@ -48,6 +48,7 @@ def valid_fn(valid_dataloader, model, criterion, epoch, device, config, ce_crite
             loss_motion = ce_criterion(motion_logits, inputs['motion_label'])
 
             loss = loss_image + loss_text + loss_color + loss_type + loss_motion   
+            # loss = loss_image + loss_text
 
         all_image_out.append(image_out)
         all_text_out.append(text_out)
@@ -134,7 +135,7 @@ def train_loop(train_folds, valid_folds, device, fold, model_checkpoint_path = N
                 loss_motion = ce_criterion(motion_logits, inputs['motion_label'])
                 
                 loss = loss_image + loss_text + loss_color + loss_type + loss_motion
-
+                #loss = loss_image + loss_text
 
             if config.general_config.gradient_accumulation_steps > 1:
                 loss = loss / config.general_config.gradient_accumulation_steps

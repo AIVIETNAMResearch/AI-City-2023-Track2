@@ -1,8 +1,8 @@
 DATA:
   USE_MOTION: True
   SIZE: 288
-  TRAIN_JSON_PATH: "data2022/train_nlpaug.json"
-  EVAL_JSON_PATH: "data2022/val_nlpaug.json"
+  TRAIN_JSON_PATH: "data/AIC23_Track2_NL_Retrieval/data/train_nlpaug.json"
+  EVAL_JSON_PATH: "data/AIC23_Track2_NL_Retrieval/data/val_nlpaug.json"
   CROP_AREA: 1.6666667 ## new_w = CROP_AREA* old_w
  
 
@@ -32,6 +32,6 @@ TRAIN:
   BATCH_SIZE: 64
 
 TEST:
-  QUERY_JSON_PATH: "data2022/test-queries_nlpaug.json"
+  QUERY_JSON_PATH: "data/AIC23_Track2_NL_Retrieval/data/test-queries_nlpaug.json"
   RESTORE_FROM: "checkpoints/circle_loss.pth"
 

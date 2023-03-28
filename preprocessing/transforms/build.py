@@ -1,4 +1,6 @@
 # encoding: utf-8
+from googletrans import Translator
+from transformers import MarianMTModel, MarianTokenizer
 
 import torchvision
 import torchvision.transforms as T
@@ -81,3 +83,35 @@ def build_motion_transform(cfg, vanilla=False):
         # RandomErasing(probability=cfg.INPUT.RE_PROB, sh=cfg.INPUT.RE_SH, mean=cfg.INPUT.PIXEL_MEAN)
     ])
     return transform
+
+
+
+class BackTranslateAug(object):
+    def __init__(self, first_model_name='Helsinki-NLP/opus-mt-en-vi', second_model_name='Helsinki-NLP/opus-mt-vi-en') -> None:
+        self.first_model_tkn = MarianTokenizer.from_pretrained(first_model_name)
+        self.first_model  = MarianMTModel.from_pretrained(first_model_name)
+
+        self.second_model_tkn = MarianTokenizer.from_pretrained(second_model_name)
+        self.second_model = MarianMTModel.from_pretrained(second_model_name)
+    
+    def format_batch_texts(self,language_code, batch_texts):
+        formatted_batch = [">>{}<< {}".format(language_code, text) for text in batch_texts]
+
+        return formatted_batch
+    
+    def translate(self, batch_texts, model, tokenizer, language="fr"):
+        # Prepare the text data into appropriate format for the model
+        formated_batch_texts = self.format_batch_texts(language, batch_texts)
+        
+        # Generate translation using model
+        translated = model.generate(**tokenizer(formated_batch_texts, return_tensors="pt", padding=True))
+
+        # Convert the generated tokens indices back into text
+        translated_texts = [tokenizer.decode(t, skip_special_tokens=True) for t in translated]
+        
+        return translated_texts
+
+    def __call__(self, original_texts, language="vi"):
+        translated_text = self.translate(original_texts, self.first_model, self.first_model_tkn)
+        back_translate_text = self.translate(translated_text, self.second_model, self.second_model_tkn)
+        return back_translate_text

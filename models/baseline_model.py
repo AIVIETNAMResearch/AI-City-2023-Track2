@@ -26,6 +26,7 @@ class VideoTextFeatureExtractor(nn.Module):
         self.text_head = ContextualizedWeightedHead(**text_head_setting['args'], device=device)
         self.vision_head = ContextualizedWeightedHead(**vision_head_setting['args'], device=device)
         
+        
     def forward(self, frames, captions, motion, motion_line):
         bz = frames.shape[0]
 
@@ -51,7 +52,10 @@ class VideoTextFeatureExtractor(nn.Module):
 
         vision_features = torch.stack([frame_features, color_features, type_features, motion_features, motion_line_features], dim=1)
         vision_features = self.vision_head(vision_features)
-        return vision_features, color_features, type_features, motion_line_features
+
+        agg_motion_features = torch.stack([motion_features, motion_line_features]).mean(dim=0)
+        #print(agg_motion_features.shape)
+        return vision_features, color_features, type_features, agg_motion_features
     
     def compute_text(self, captions):
         text_features = self.base.compute_text(captions)

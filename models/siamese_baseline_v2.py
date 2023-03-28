@@ -318,7 +318,8 @@ class SiameseLocalandMotionModelBIG_DualTextCat(torch.nn.Module):
             self.pre_id_cls3 = nn.Sequential(*pre_shared_cls3)
             self.id_cls3 = build_softmax_cls(model_cfg=self.model_cfg, loss_type=self.model_cfg.HEAD.SHARED_CLS)
 
-    def encode_text(self, nl_mo_input_ids, nl_mo_attention_mask, nl_car_input_ids, nl_car_attention_mask):
+    def encode_text(self, nl_mo_input_ids, nl_mo_attention_mask, nl_car_input_ids, nl_car_attention_mask,
+                    clip_car_features_text=None):
         outputs_mo = self.bert_model(nl_mo_input_ids, attention_mask=nl_mo_attention_mask)
         lang_motion_embeds = torch.mean(outputs_mo.last_hidden_state, dim=1)
         lang_motion_embeds = self.lang_mo_fc(lang_motion_embeds)
@@ -326,6 +327,9 @@ class SiameseLocalandMotionModelBIG_DualTextCat(torch.nn.Module):
         outputs_car = self.bert_model(nl_car_input_ids, attention_mask=nl_car_attention_mask)
         lang_car_embeds = torch.mean(outputs_car.last_hidden_state, dim=1)
         lang_car_embeds = self.lang_car_fc(lang_car_embeds)
+        if clip_car_features_text is not None:
+            print(clip_car_features_text.shape, " LANG CAR")
+            lang_car_embeds = torch.add(lang_car_embeds, clip_car_features_text)
 
         if self.model_cfg.HEAD.CAT_TRAIN:
             if lang_motion_embeds.shape[0] != lang_car_embeds.shape[0]:
@@ -353,12 +357,16 @@ class SiameseLocalandMotionModelBIG_DualTextCat(torch.nn.Module):
 
         return [lang_car_embeds, lang_mo_embeds, lang_merge_embeds]
 
-    def encode_images(self, crops, motion):
+    def encode_images(self, crops, motion, clip_car_features_vis=None):
         visual_car_embeds = self.domian_vis_fc(self.vis_backbone(crops))
         visual_car_embeds = visual_car_embeds.view(visual_car_embeds.size(0), -1)
 
         visual_mo_embeds = self.domian_vis_fc_bk(self.vis_backbone_bk(motion))
         visual_mo_embeds = visual_mo_embeds.view(visual_mo_embeds.size(0), -1)
+
+        if clip_car_features_vis is not None:
+            print(clip_car_features_vis.shape, " LANG CAR")
+            visual_car_embeds = torch.add(visual_car_embeds, clip_car_features_vis)
 
         if self.model_cfg.HEAD.CAT_TRAIN:
             visual_merge_embeds = self.vis_fc_merge(torch.cat([visual_car_embeds, visual_mo_embeds], dim=-1))
@@ -375,7 +383,7 @@ class SiameseLocalandMotionModelBIG_DualTextCat(torch.nn.Module):
         return [visual_car_embeds, visual_mo_embeds, visual_merge_embeds]
 
     def forward(self, nl_mo_input_ids, nl_mo_attention_mask, nl_car_input_ids, nl_car_attention_mask,
-                crops, motion, targets=None):
+                crops, motion, targets=None, clip_car_features_text=None, clip_car_features_vis=None):
         # text
         outputs_mo = self.bert_model(nl_mo_input_ids, attention_mask=nl_mo_attention_mask)
         lang_motion_embeds = torch.mean(outputs_mo.last_hidden_state, dim=1)
@@ -384,6 +392,15 @@ class SiameseLocalandMotionModelBIG_DualTextCat(torch.nn.Module):
         outputs_car = self.bert_model(nl_car_input_ids, attention_mask=nl_car_attention_mask)
         lang_car_embeds = torch.mean(outputs_car.last_hidden_state, dim=1)
         lang_car_embeds = self.lang_car_fc(lang_car_embeds)
+        
+        if clip_car_features_text is not None:
+            print(clip_car_features_text.shape, " LANG CAR")
+            
+            lang_car_embeds = torch.add(lang_car_embeds, clip_car_features_text)
+
+        if clip_car_features_vis is not None:
+            print(clip_car_features_vis.shape, " LANG CAR")
+            visual_car_embeds = torch.add(visual_car_embeds, clip_car_features_vis)
 
         # visual
         visual_car_embeds = self.domian_vis_fc(self.vis_backbone(crops))

@@ -15,9 +15,9 @@ from test import inference_vis_and_lang
 
 
 # with open("data2022/test-queries_nlpaug.json") as f:
-with open("data2022/test-queries.json") as f:
+with open("data/AIC23_Track2_NL_Retrieval/data/test-queries.json") as f:
     queries = json.load(f)
-with open("data2022/test-tracks.json") as f:
+with open("data/AIC23_Track2_NL_Retrieval/data/test-tracks.json") as f:
     tracks = json.load(f)
 query_ids = list(queries.keys())
 tacks_ids = list(tracks.keys())
@@ -106,8 +106,8 @@ def feature_mean_score_test(args, config_list, merge_weights, enforced=False, sp
             track_car_embeds = pickle.load(fb)
 
     results = dict()
-
-    for query in query_ids:
+    sim_matrix = np.zeros((184,184))
+    for id, query in enumerate(query_ids):
         score = 0.
         for i in range(len(nlp_feats)):
             q = nlp_feats[i][query]
@@ -135,6 +135,8 @@ def feature_mean_score_test(args, config_list, merge_weights, enforced=False, sp
                 cur_sim = cur_sim + loc_sim
             score += merge_weights[i] * cur_sim
 
+        sim_matrix[id] = score
+
         index = np.argsort(score)[::-1]
         results[query] = []
         for i in index:
@@ -146,24 +148,36 @@ def feature_mean_score_test(args, config_list, merge_weights, enforced=False, sp
         json.dump(results, fs, indent=4)
         print(f"====> save {save_path} done")
 
+    with open("sim_mat.npy", "wb") as f:
+        np.save(f, sim_matrix)
 
 def main():
     args, cfg = prepare_start()
 
     config_dict = {
-        'view_triplet_hard': 1,
-        'single_baseline_aug1_plus': 1,
-        'dual_baseline_aug1': 1,
+        'view_triplet_hard': 1.5,
+        'single_baseline_aug1_plus': 1.5,
+        ##'dual_baseline_aug1': 1,
         'dual_baseline_aug3': 1,
         'circle_loss': 1,
-        'single_baseline_aug2': 1,
+        ##'single_baseline_aug2': 1,
+        ##'single_baseline_aug1_plus_concat_frms': 1,
+        ##'dual_baseline_multi_back': 1,
+        ##'single_baseline_aug1_vit': 0.8,
+        ##'dual_baseline_aug3_multiframes': 0.2
+        ##'single_baseline_aug1_clipfeats': 1
+        'single_baseline_aug1_plus_pseudo': 1.5,
+        #'view_triplet_hard_pseudo': 1,
+        #'dual_baseline_aug1_pseudo': 1
+        'single_baseline_aug1_plus_multi_queries': 1
+
     }
 
     config_file_list = list(config_dict.keys())
     merge_weights = list(config_dict.values())
 
     feat = -1
-    args.save_name = f'ensemble_spatial_modeling.json'
+    args.save_name = f'multi_queries_ens.json'
     args.cfg.MODEL.MAIN_FEAT_IDX = feat
     # spatial = False
     spatial = True

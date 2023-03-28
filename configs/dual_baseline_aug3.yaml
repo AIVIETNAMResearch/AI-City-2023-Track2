@@ -1,10 +1,13 @@
 DATA:
   USE_MOTION: True
   SIZE: 288
-  TRAIN_JSON_PATH: "data2022/train_nlpaug_3.json"
-  EVAL_JSON_PATH: "data2022/val_nlpaug_3.json"
+  TRAIN_JSON_PATH: "data/AIC23_Track2_NL_Retrieval/data/train_nlpaug_4.json"
+  EVAL_JSON_PATH: "data/AIC23_Track2_NL_Retrieval/data/val_nlpaug_3.json"
   CROP_AREA: 1.6666667 ## new_w = CROP_AREA* old_w
- 
+  USE_HEATMAP: False
+  MULTI_FRAMES: False
+  FRAMES_CONCAT: False
+  TEXT_AUG: False 
 
 
 MODEL:
@@ -18,9 +21,9 @@ MODEL:
   SAME_TEXT: True
   MERGE_DIM: 1024
 TRAIN: 
-  BATCH_SIZE: 64
+  BATCH_SIZE: 36
 
 TEST:
-  QUERY_JSON_PATH: "data2022/test-queries_nlpaug_3.json"
+  QUERY_JSON_PATH: "data/AIC23_Track2_NL_Retrieval/data/test-queries_nlpaug_3.json"
   RESTORE_FROM: "checkpoints/dual_baseline_aug3.pth"
 

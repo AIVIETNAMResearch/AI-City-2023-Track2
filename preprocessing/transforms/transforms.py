@@ -11,6 +11,8 @@ import cv2
 from collections import deque
 from PIL import Image, ImageFilter
 import torch
+from transformers import MarianMTModel, MarianTokenizer
+
 
 class RandomResolution(object):
 

@@ -61,11 +61,11 @@ def main():
 
     data_df = load_training_data(config)
 
-    for fold in [3,4]:
+    for fold in range(config.general_config.kfolds):
         train_fold = data_df[data_df['fold'] != fold].reset_index(drop=True)
         valid_fold = data_df[data_df['fold'] == fold].reset_index(drop=True)
         
-        model_checkpoint_path = f'./checkpoint'
+        model_checkpoint_path = f'./checkpoint/baseline_wcolor'
         print(f"TRAINING FOLD {fold + 1}")
         train_loop(train_fold,
                 valid_fold,

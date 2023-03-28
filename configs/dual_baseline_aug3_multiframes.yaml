@@ -1,0 +1,30 @@
+DATA:
+  USE_MOTION: True
+  SIZE: 144
+  TRAIN_JSON_PATH: "data/AIC23_Track2_NL_Retrieval/data/train_nlpaug_3.json"
+  EVAL_JSON_PATH: "data/AIC23_Track2_NL_Retrieval/data/val_nlpaug_3.json"
+  CROP_AREA: 1.6666667 ## new_w = CROP_AREA* old_w
+  USE_HEATMAP: True
+  MULTI_FRAMES: True
+  FRAMES_CONCAT: False
+  NUM_FRAMES: 8
+
+
+MODEL:
+  NAME: "dual-text-cat-multiframes"
+  BERT_TYPE: "ROBERTA"
+  BERT_NAME: "roberta-large"
+  IMG_ENCODER: "efficientnet-b2"
+  car_idloss: False
+  mo_idloss: False
+  share_idloss: False
+  con_idloss: False
+  SAME_TEXT: True
+  MERGE_DIM: 1024
+TRAIN:  
+  BATCH_SIZE: 26
+
+TEST:
+  QUERY_JSON_PATH: "data/AIC23_Track2_NL_Retrieval/data/test-queries_nlpaug_3.json"
+  RESTORE_FROM: "checkpoints/checkpoint_best_eval.pth"
+
