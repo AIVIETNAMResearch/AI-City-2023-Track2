@@ -357,6 +357,10 @@ class CityFlowNLInferenceDataset(Dataset):
                     size = self.data_cfg.SIZE
                     concat_crops[:, x_indx * size: (x_indx +1) * size, y_indx * size: (y_indx+1) * size] = crop
                 crops = concat_crops
+                resize = torchvision.transforms.Resize(size=(self.data_cfg.SIZE, self.data_cfg.SIZE))
+                concat_crops = resize(concat_crops)
+                crop = concat_crops
+                
             else:
                 
                 tmp_crops = torch.zeros((self.data_cfg.NUM_FRAMES, 3, self.data_cfg.SIZE, self.data_cfg.SIZE))
