@@ -199,8 +199,11 @@ class CityFlowNLDataset(Dataset):
                 x_indx = idx % 2
                 y_indx = idx // 2
                 size = self.data_cfg.SIZE
-                concat_crops[:, x_indx * size: (x_indx +1) * size, y_indx * size : (y_indx+1) * size] = crop    
-            
+                concat_crops[:, x_indx * size: (x_indx +1) * size, y_indx * size : (y_indx+1) * size] = crop
+
+
+            resize = torchvision.transforms.Resize(size=(self.data_cfg.SIZE, self.data_cfg.SIZE))
+            concat_crops = resize(concat_crops)
             crop = concat_crops
 
         else:

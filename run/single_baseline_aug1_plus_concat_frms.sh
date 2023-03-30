@@ -1,7 +1,7 @@
 name='single_baseline_aug1_plus_concat_frms'
 config='configs/single_baseline_aug1_plus_concat_frms.yaml'
 
-epo='20'
+epo='400'
 freeze='0'
 delay='80'
 warm='40'

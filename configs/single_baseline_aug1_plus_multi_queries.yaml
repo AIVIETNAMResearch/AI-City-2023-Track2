@@ -14,7 +14,7 @@ MODEL:
   mo_idloss: False
   share_idloss: False
 TRAIN: 
-  BATCH_SIZE: 40
+  BATCH_SIZE: 32
 
 TEST:
   QUERY_JSON_PATH: "data/AIC23_Track2_NL_Retrieval/data/test-queries_nlpaug.json"
