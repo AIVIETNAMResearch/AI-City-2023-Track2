@@ -1,7 +1,7 @@
 DATA:
   USE_MOTION: True
   SIZE: 288
-  TRAIN_JSON_PATH: "data/AIC23_Track2_NL_Retrieval/data/train-tracks_nlpaug.json"
+  TRAIN_JSON_PATH: "data/AIC23_Track2_NL_Retrieval/data/train_nlpaug.json"
   EVAL_JSON_PATH: "data/AIC23_Track2_NL_Retrieval/data/val_nlpaug.json"
   CROP_AREA: 1.0 ## new_w = CROP_AREA* old_w
   FRAMES_CONCAT: True
