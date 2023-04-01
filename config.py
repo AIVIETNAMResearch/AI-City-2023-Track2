@@ -20,7 +20,7 @@ save_clip_feats = osp.join(data_path, "clip_feats")
 # DATA process related configurations.
 _C.DATA = CN()
 _C.DATA.CITYFLOW_PATH = dataset_path
-_C.DATA.NUM_FRAMES = 8
+_C.DATA.NUM_FRAMES = 2
 # _C.DATA.TRAIN_JSON_PATH = "data/train.json"
 # _C.DATA.EVAL_JSON_PATH = "data/val.json"
 _C.DATA.TRAIN_JSON_PATH = "data/train.json"

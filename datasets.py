@@ -182,29 +182,62 @@ class CityFlowNLDataset(Dataset):
                 }
             
         if self.frames_concat:
-            frames_idxes = sample_frames(4, len(track["frames"]), sample='uniform')
-            concat_crops = torch.zeros((3, self.data_cfg.SIZE*2, self.data_cfg.SIZE*2))
-            for idx, frame_idx in enumerate(frames_idxes):
-                frame_path = os.path.join(self.data_cfg.CITYFLOW_PATH, track["frames"][frame_idx])
-                frame = default_loader(frame_path)
-                box = track["boxes"][frame_idx]
-                if self.crop_area == 1.6666667:
-                    box = (int(box[0]-box[2]/3.),int(box[1]-box[3]/3.),int(box[0]+4*box[2]/3.),int(box[1]+4*box[3]/3.))
-                else:
-                    box = (int(box[0]-(self.crop_area-1)*box[2]/2.),int(box[1]-(self.crop_area-1)*box[3]/2),int(box[0]+(self.crop_area+1)*box[2]/2.),int(box[1]+(self.crop_area+1)*box[3]/2.))
-                
-                crop = frame.crop(box)
-                if self.transform is not None:
-                    crop = self.transform(crop)
-                x_indx = idx % 2
-                y_indx = idx // 2
-                size = self.data_cfg.SIZE
-                concat_crops[:, x_indx * size: (x_indx +1) * size, y_indx * size : (y_indx+1) * size] = crop
+            
+            num_frms = self.data_cfg.NUM_FRAMES
+            frames_idxes = sample_frames(self.data_cfg.NUM_FRAMES, len(track["frames"]), sample='uniform')
 
+            if num_frms == 4:
+                concat_crops = torch.zeros((3, self.data_cfg.SIZE*2, self.data_cfg.SIZE*2))
+                for idx, frame_idx in enumerate(frames_idxes):
+                    frame_path = os.path.join(self.data_cfg.CITYFLOW_PATH, track["frames"][frame_idx])
+                    frame = default_loader(frame_path)
+                    box = track["boxes"][frame_idx]
+                    if self.crop_area == 1.6666667:
+                        box = (int(box[0]-box[2]/3.),int(box[1]-box[3]/3.),int(box[0]+4*box[2]/3.),int(box[1]+4*box[3]/3.))
+                    else:
+                        box = (int(box[0]-(self.crop_area-1)*box[2]/2.),int(box[1]-(self.crop_area-1)*box[3]/2),int(box[0]+(self.crop_area+1)*box[2]/2.),int(box[1]+(self.crop_area+1)*box[3]/2.))
+                    
+                    crop = frame.crop(box)
+                    if self.transform is not None:
+                        crop = self.transform(crop)
+                    x_indx = idx % 2
+                    y_indx = idx // 2
+                    size = self.data_cfg.SIZE
+                    concat_crops[:, x_indx * size: (x_indx +1) * size, y_indx * size : (y_indx+1) * size] = crop
+                resize = torchvision.transforms.Resize(size=(self.data_cfg.SIZE, self.data_cfg.SIZE))
+                concat_crops = resize(concat_crops)
+                crop = concat_crops
+            else:
+                list_2d = []
+                cnt = 0
+                for _ in range(int(np.floor(np.sqrt(num_frms)))):
+                    list_1d = []
+                    for _ in range(int(np.ceil(np.sqrt(num_frms)))):
+                        if cnt < len(frames_idxes):
+                            frame_idx = frames_idxes[cnt]
+                            frame_path = os.path.join(self.data_cfg.CITYFLOW_PATH, track["frames"][frame_idx])
+                            frame = default_loader(frame_path)
+                        
+                            box = track["boxes"][frame_idx]
+                            if self.crop_area == 1.6666667:
+                                box = (int(box[0]-box[2]/3.),int(box[1]-box[3]/3.),int(box[0]+4*box[2]/3.),int(box[1]+4*box[3]/3.))
+                            else:
+                                box = (int(box[0]-(self.crop_area-1)*box[2]/2.),int(box[1]-(self.crop_area-1)*box[3]/2),int(box[0]+(self.crop_area+1)*box[2]/2.),int(box[1]+(self.crop_area+1)*box[3]/2.))
+                            
+                            crop = frame.crop(box)
+                            #print(type(crop))
+                            crop = cv2.resize(np.array(crop), dsize=(self.data_cfg.SIZE, self.data_cfg.SIZE))
+                        else:
+                            crop = np.zeros((self.data_cfg.SIZE, self.data_cfg.SIZE, 3)).astype(np.uint8)
+                        list_1d.append(crop)
+                        cnt += 1
+                    list_2d.append(list_1d)
 
-            resize = torchvision.transforms.Resize(size=(self.data_cfg.SIZE, self.data_cfg.SIZE))
-            concat_crops = resize(concat_crops)
-            crop = concat_crops
+                concat_crops = cv2.vconcat([cv2.hconcat(list_h) for list_h in list_2d])
+                if self.transform:
+                    concat_crops = Image.fromarray(concat_crops)
+                    concat_crops = self.transform(concat_crops)
+                crop = concat_crops
 
         else:
             frame_path = os.path.join(self.data_cfg.CITYFLOW_PATH, track["frames"][frame_idx])
@@ -307,8 +340,8 @@ class CityFlowNLInferenceDataset(Dataset):
 
 
         for track_id_index,track in enumerate(self.list_of_tracks):
-            if use_multi_frames or frames_concat:
-                num_frames = 4 if frames_concat else self.data_cfg.NUM_FRAMES
+            if use_multi_frames:
+                num_frames = self.data_cfg.NUM_FRAMES
                 frame_indexes = sample_frames(num_frames, len(track['frames']), sample='uniform')
                 frame_paths = [os.path.join(self.data_cfg.CITYFLOW_PATH, track['frames'][idx]) for idx in frame_indexes]
                 boxes = [track['boxes'][idx] for idx in frame_indexes]
@@ -316,11 +349,21 @@ class CityFlowNLInferenceDataset(Dataset):
                 self.list_of_crops.append(crop)
 
             else:
-                for frame_idx, frame in enumerate(track["frames"]):
-                    frame_path = os.path.join(self.data_cfg.CITYFLOW_PATH, frame)
-                    box = track["boxes"][frame_idx]
-                    crop = {"frames": frame_path, "frames_id":frame_idx,"track_id": self.list_of_uuids[track_id_index], "boxes": box}
-                    self.list_of_crops.append(crop)
+                if frames_concat:
+                    for index in range(0, len(track["frames"]) - self.data_cfg.NUM_FRAMES):
+                        tmp_frames = track["frames"][index:]
+                        frame_indexes = sample_frames(self.data_cfg.NUM_FRAMES, len(tmp_frames), sample='uniform')
+                        frame_paths = [os.path.join(self.data_cfg.CITYFLOW_PATH, tmp_frames[idx][2:]) for idx in frame_indexes]
+                        boxes = [track['boxes'][idx+index] for idx in frame_indexes]
+                        crop = {'frames': frame_paths, 'frames_id': index, "track_id": self.list_of_uuids[track_id_index], "boxes": boxes}
+                        self.list_of_crops.append(crop)
+                        
+                else:
+                    for frame_idx, frame in enumerate(track["frames"]):
+                        frame_path = os.path.join(self.data_cfg.CITYFLOW_PATH, frame)
+                        box = track["boxes"][frame_idx]
+                        crop = {"frames": frame_path, "frames_id":frame_idx,"track_id": self.list_of_uuids[track_id_index], "boxes": box}
+                        self.list_of_crops.append(crop)
         self._logger = get_logger()
         print(f"====> {self.data_cfg.TEST_TRACKS_JSON_PATH} data load, ids: {len(self.list_of_crops)}")
 
@@ -333,33 +376,67 @@ class CityFlowNLInferenceDataset(Dataset):
         if self.use_multi_frames or self.frames_concat:
             frames_path = track['frames']
 
-            crops = []
-            for idx, frame_path in enumerate(frames_path):
-                frame = default_loader(frame_path)
+            if not (self.frames_concat and self.data_cfg.NUM_FRAMES !=4):
+                crops = []
+                for idx, frame_path in enumerate(frames_path):
+                    #print(frame_path)
+                    frame = default_loader(frame_path)
+                        
+                    box = track["boxes"][idx]
+                    if self.crop_area == 1.6666667:
+                        box = (int(box[0]-box[2]/3.),int(box[1]-box[3]/3.),int(box[0]+4*box[2]/3.),int(box[1]+4*box[3]/3.))
+                    else:
+                        box = (int(box[0]-(self.crop_area-1)*box[2]/2.),int(box[1]-(self.crop_area-1)*box[3]/2),int(box[0]+(self.crop_area+1)*box[2]/2.),int(box[1]+(self.crop_area+1)*box[3]/2.))
                     
-                box = track["boxes"][idx]
-                if self.crop_area == 1.6666667:
-                    box = (int(box[0]-box[2]/3.),int(box[1]-box[3]/3.),int(box[0]+4*box[2]/3.),int(box[1]+4*box[3]/3.))
-                else:
-                    box = (int(box[0]-(self.crop_area-1)*box[2]/2.),int(box[1]-(self.crop_area-1)*box[3]/2),int(box[0]+(self.crop_area+1)*box[2]/2.),int(box[1]+(self.crop_area+1)*box[3]/2.))
-                
-                crop = frame.crop(box)
-                if self.transform is not None:
-                    crop = self.transform(crop)
+                    crop = frame.crop(box)
+                    if self.transform is not None:
+                        crop = self.transform(crop)
 
-                crops.append(crop)
+                    crops.append(crop)
 
             if self.frames_concat:
-                concat_crops = torch.zeros(3, self.data_cfg.SIZE * 2, self.data_cfg.SIZE * 2)
-                for idx_, crop in enumerate(crops):
-                    x_indx = idx_ % 2
-                    y_indx = idx_ // 2
-                    size = self.data_cfg.SIZE
-                    concat_crops[:, x_indx * size: (x_indx +1) * size, y_indx * size: (y_indx+1) * size] = crop
-                crops = concat_crops
-                resize = torchvision.transforms.Resize(size=(self.data_cfg.SIZE, self.data_cfg.SIZE))
-                concat_crops = resize(concat_crops)
-                crop = concat_crops
+                num_frms = self.data_cfg.NUM_FRAMES
+                if num_frms == 4:
+                    concat_crops = torch.zeros(3, self.data_cfg.SIZE * 2, self.data_cfg.SIZE * 2)
+                    for idx_, crop in enumerate(crops):
+                        x_indx = idx_ % 2
+                        y_indx = idx_ // 2
+                        size = self.data_cfg.SIZE
+                        concat_crops[:, x_indx * size: (x_indx +1) * size, y_indx * size: (y_indx+1) * size] = crop
+
+                    resize = torchvision.transforms.Resize(size=(self.data_cfg.SIZE, self.data_cfg.SIZE))
+                    concat_crops = resize(concat_crops)
+                    crops = concat_crops
+                else:
+                    
+                    list_2d = []
+                    cnt = 0
+                    for _ in range(int(np.floor(np.sqrt(num_frms)))):
+                        list_1d = []
+                        for _ in range(int(np.ceil(np.sqrt(num_frms)))):
+                            if cnt < len(frames_path):
+                                frame_path = frames_path[cnt]
+                                frame = default_loader(frame_path)
+                                box = track["boxes"][cnt]
+                                if self.crop_area == 1.6666667:
+                                    box = (int(box[0]-box[2]/3.),int(box[1]-box[3]/3.),int(box[0]+4*box[2]/3.),int(box[1]+4*box[3]/3.))
+                                else:
+                                    box = (int(box[0]-(self.crop_area-1)*box[2]/2.),int(box[1]-(self.crop_area-1)*box[3]/2),int(box[0]+(self.crop_area+1)*box[2]/2.),int(box[1]+(self.crop_area+1)*box[3]/2.))
+                                
+                                crop = frame.crop(box)
+                                #print(type(crop))
+                                crop = cv2.resize(np.array(crop), dsize=(self.data_cfg.SIZE, self.data_cfg.SIZE))
+                            else:
+                                crop = np.zeros((self.data_cfg.SIZE, self.data_cfg.SIZE, 3)).astype(np.uint8)
+                            list_1d.append(crop)
+                            cnt += 1
+                        list_2d.append(list_1d)
+
+                    concat_crops = cv2.vconcat([cv2.hconcat(list_h) for list_h in list_2d])
+                    if self.transform:
+                        concat_crops = Image.fromarray(concat_crops)
+                        concat_crops = self.transform(concat_crops)
+                    crops = concat_crops
                 
             else:
                 

@@ -415,6 +415,8 @@ def main():
     print("Using frames concat: ", cfg.DATA.FRAMES_CONCAT)
     print("Using heatmap: ", cfg.DATA.USE_HEATMAP)
     print("Using Text Aug: ", cfg.DATA.TEXT_AUG)
+    if cfg.DATA.FRAMES_CONCAT or cfg.DATA.MULTI_FRAMES:
+        print("Num frames: ", cfg.DATA.NUM_FRAMES)
 
 
     args.use_cuda = True
