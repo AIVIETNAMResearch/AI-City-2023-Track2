@@ -1,5 +1,5 @@
 name='eval_only'
-config='configs/dual_baseline_aug1.yaml'
+config='configs/single_baseline_aug1_plus_concat_frms.yaml'
 
 python3 main.py --name ${name} \
 --config ${config} \

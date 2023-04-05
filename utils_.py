@@ -138,6 +138,22 @@ def accuracy(output, target, topk=(1,)):
             res.append(correct_k.mul_(100.0 / batch_size))
         return res
 
+def recall_at_k(output, target, topk=1):
+    """Computes the recall@5 for the predictions"""
+    with torch.no_grad():
+        _, pred = output.topk(k=topk, dim=1, largest=True, sorted=True)
+        correct = pred.eq(target.view(-1, 1).expand_as(pred))
+        num_correct = correct.sum(dim=1)
+        recall = num_correct.gt(0).float().mean().item() * 100.0
+        return recall
+    
+def recall(output, target, topk=(1,)):
+    res = []
+    for k in topk:
+        res.append(recall_at_k(output, target, topk=k))
+    return res
+
+
 
 class AverageMeter(object):
     """Computes and stores the average and current value"""

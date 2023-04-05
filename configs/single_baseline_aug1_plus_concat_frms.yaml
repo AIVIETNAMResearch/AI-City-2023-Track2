@@ -2,9 +2,10 @@ DATA:
   USE_MOTION: True
   SIZE: 288
   TRAIN_JSON_PATH: "data/AIC23_Track2_NL_Retrieval/data/train_nlpaug.json"
-  EVAL_JSON_PATH: "data/AIC23_Track2_NL_Retrieval/data/val_nlpaug.json"
+  EVAL_JSON_PATH: "data/AIC23_Track2_NL_Retrieval/data/test_nlpaug.json"
   CROP_AREA: 1.0 ## new_w = CROP_AREA* old_w
-  FRAMES_CONCAT: True
+  FRAMES_CONCAT: False
+  NUM_FRAMES: 4
 
 
 MODEL:
@@ -20,4 +21,4 @@ TRAIN:
 
 TEST:
   QUERY_JSON_PATH: "data/AIC23_Track2_NL_Retrieval/data/test-queries_nlpaug.json"
-  RESTORE_FROM: "checkpoints/single_baseline_aug1_plus_concat_frames.pth"
+  RESTORE_FROM: "logs/single_baseline_aug1_plus_lr0.01_freeze0_warm40_decay-80/checkpoint_best_eval.pth"

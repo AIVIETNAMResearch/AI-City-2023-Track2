@@ -25,7 +25,7 @@ import random
 from config import get_default_config
 from models import build_model
 from utils_ import TqdmToLogger, Logger, AverageMeter, accuracy, ProgressMeter
-from utils_ import get_mrr, MgvSaveHelper, set_seed
+from utils_ import get_mrr, MgvSaveHelper, set_seed, recall
 from datasets import CityFlowNLDataset
 from datasets import CityFlowNLInferenceDataset
 from torch.optim.lr_scheduler import _LRScheduler
@@ -44,13 +44,13 @@ best_mrr_eval_by_test = 0.
 
 table = []
 max_record = ['Max', 'Max', 0, 0, 0, 0, 0]
-header = ['Method', 'Dataset', 'Epoch', 'Loss', 'MRR', 'Acc-1', 'Acc-5']
+header = ['Method', 'Dataset', 'Epoch', 'Loss', 'MRR', 'Acc-1', 'Acc-5', 'Recall@5', 'Recall@10']
 table.append(header)
 print_interval = 20  # csv
 save_interval = 200   # checkpoint
 
 
-def results_record(name, dataset, epoch, losses, mrr, top1_acc, top5_acc, is_test=False):
+def results_record(name, dataset, epoch, losses, mrr, top1_acc, top5_acc, top5_rec=None, top10_rec=None, is_test=False):
     # result csv
     record = list()
     # name = args.name
@@ -61,6 +61,10 @@ def results_record(name, dataset, epoch, losses, mrr, top1_acc, top5_acc, is_tes
     record.append(mrr)
     record.append(top1_acc)
     record.append(top5_acc)
+    if top5_rec != None:
+        record.append(top5_rec)
+    if top10_rec != None:
+        record.append(top10_rec)
     table.append(record)
     print_table = copy.deepcopy(table)
     global max_record
@@ -212,10 +216,16 @@ def evaluate_by_test_all(model, valloader, epoch, cfg, index=-1, args=None, toke
         loss = (loss_t_2_i + loss_i_2_t) / 2
 
         acc1, acc5 = accuracy(sim_t_2_i, torch.arange(sim_t_2_i.size(0)).cuda(), topk=(1, 5))
+        recall5, recall10 = recall(sim_t_2_i, torch.arange(sim_t_2_i.size(0)).cuda(), topk=(5, 10))
         mrr_ = get_mrr(sim_t_2_i)
         all_mrr = mrr_.item() * 100
+        print(recall5, "REC 5")
+        print(recall10, "REC 10")
+        print(acc1, "Acc@1")
+        print(acc5, "Acc@5")
+
         results_record(name, valloader.dataset.name, epoch, loss.item(),
-                       all_mrr, acc1[0], acc5[0], is_test=True)
+                       all_mrr, acc1[0], acc5[0], recall5, recall10, is_test=True)
         return all_mrr
 
     sum_sim = 0.
@@ -254,6 +264,9 @@ def evaluate_by_test(model, valloader, epoch, cfg, index=-1, args=None, tokenize
     mrr = AverageMeter('MRR', ':6.4f')
     top1_acc = AverageMeter('Acc@1', ':6.4f')
     top5_acc = AverageMeter('Acc@5', ':6.4f')
+    top5_rec = AverageMeter('Recall@5', ':6.4f')
+    top10_rec = AverageMeter('Recall@10', ':6.4f')
+
     progress = ProgressMeter(
         len(valloader),
         [batch_time, data_time, losses, mrr, top1_acc, top5_acc],
@@ -364,13 +377,20 @@ def evaluate_by_test(model, valloader, epoch, cfg, index=-1, args=None, tokenize
     loss = (loss_t_2_i + loss_i_2_t) / 2
 
     acc1, acc5 = accuracy(all_sim, torch.arange(all_sim.size(0)).cuda(), topk=(1, 5))
+    rec5, rec10 = recall(all_sim, torch.arange(all_sim.size(0)).cuda(), topk=(5, 10))
+
     mrr_ = get_mrr(all_sim)
     all_mrr = mrr_.item() * 100
+
+
 
     losses.update(loss.item(), image.size(0))
     mrr.update(all_mrr, image.size(0))
     top1_acc.update(acc1[0], image.size(0))
     top5_acc.update(acc5[0], image.size(0))
+    top5_rec.update(rec5, image.size(0))
+    top10_rec.update(rec10, image.size(0))
+
     batch_time.update(time.time() - end)
 
     progress.display(batch_idx)
@@ -379,7 +399,7 @@ def evaluate_by_test(model, valloader, epoch, cfg, index=-1, args=None, tokenize
     print(f'Epoch {epoch} running time: ', timedelta(seconds=evl_end_time - evl_start_time))
     print(f'Logs dir: {args.logs_dir} ')
 
-    results_record(args.logs_dir.split('/')[-1], valloader.dataset.name, epoch, loss.item(), all_mrr, acc1[0], acc5[0], is_test=True)
+    results_record(args.logs_dir.split('/')[-1], valloader.dataset.name, epoch, loss.item(), all_mrr, acc1[0], acc5[0], rec5, rec10, is_test=True)
     if args.eval_only:
         return
     if all_mrr > best_mrr_eval_by_test:
@@ -418,7 +438,7 @@ def main():
     if cfg.DATA.FRAMES_CONCAT or cfg.DATA.MULTI_FRAMES:
         print("Num frames: ", cfg.DATA.NUM_FRAMES)
 
-
+    print(cfg.TRAIN.BATCH_SIZE, "BS")
     args.use_cuda = True
     train_data=CityFlowNLDataset(cfg.DATA, json_path=cfg.DATA.TRAIN_JSON_PATH,
                                  transform=transform_train, motion_transform=motion_transform,
