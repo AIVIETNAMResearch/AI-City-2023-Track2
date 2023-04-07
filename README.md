@@ -1,5 +1,10 @@
 # Track2-Vehicle_Retrieval
-
+Source code for Track 2 AI City Challenge 2023 submission
+## Pipeline
+We use the pipeline in the picture below:
+<p align="center">
+    <img src="figs/pipeline_redraw5.png">
+</p> 
 The directory structures in data is as follows
 
 ```
