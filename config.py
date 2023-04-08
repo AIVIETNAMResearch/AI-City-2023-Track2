@@ -10,8 +10,8 @@ dataset_path_2021 = '/data/datasets/aicity2021/AIC21_Track5_NL_Retrieval'
 data_path_2021 = '/data/datasets/aicity2021/AIC21_Track5_NL_Retrieval/new_baseline/AIC21_Track5_NL_Retrieval'
 save_mo_dir_2021 = osp.join(data_path_2021, "data/motion_map_iou")
 
-dataset_path = '/media/aivn2023/86c50d28-d521-419b-a569-3aab9993961f/media/ai2023/HungAn/Track2-Vehicle-Retrieval/Track2-Vehicle_Retrieval/data/AIC23_Track2_NL_Retrieval/data'
-data_path = '/media/aivn2023/86c50d28-d521-419b-a569-3aab9993961f/media/ai2023/HungAn/Track2-Vehicle-Retrieval/Track2-Vehicle_Retrieval/data/AIC23_Track2_NL_Retrieval/data'
+dataset_path = './data/AIC23_Track2_NL_Retrieval/data'
+data_path = './data/AIC23_Track2_NL_Retrieval/data'
 save_mo_dir = osp.join(data_path, "data/motion_map_iou")
 save_heatmap_dir = osp.join(data_path, "data/motion_heatmap")
 save_clip_feats = osp.join(data_path, "clip_feats")
