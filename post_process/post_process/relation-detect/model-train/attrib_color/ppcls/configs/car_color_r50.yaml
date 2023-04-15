@@ -1,0 +1,144 @@
+use_ema: True
+# global configs
+Global:
+  checkpoints: null
+#   pretrained_model: ./output/ResNet50_vd_color/best_model
+  pretrained_model: ./pretrained/ResNet50_vd_ssld_pretrained
+  output_dir: ./output/
+  device: gpu
+  save_interval: 1
+  eval_during_train: True
+  eval_interval: 1
+  epochs: 30
+  print_batch_step: 10
+  use_visualdl: False
+  # used for static mode and model export
+  image_shape: [3, 224, 224]
+  save_inference_dir: ./inference
+# model architecture
+Arch:
+  name: ResNet50_vd
+  class_num: [8]
+  multi_branch: True
+  #pretrained: True
+  pretrained: False
+
+# loss function config for traing/eval process
+Loss:
+  Train:
+    - CELoss:
+        weight: [1]
+        
+  Eval:
+    - CELoss:
+        weight: [1]
+
+    
+Optimizer:
+  name: Momentum
+  momentum: 0.9
+  lr:
+    name: Piecewise
+    learning_rate: 0.01
+    decay_epochs: [20, 25]
+    values: [0.01, 0.001, 0.0001]
+  regularizer:
+    name: 'L2'
+    coeff: 0.001
+
+
+# data loader for train and eval
+DataLoader:
+  Train:
+    dataset:
+      name: CarAttriDataset
+      image_root: dataset/AICITY2022/data/
+      cls_label_path: label/train_aic22_color_no_syn.txt
+      is_multi_head: True
+      transform_ops:
+        - DecodeImage:
+            to_rgb: True
+            channel_first: False
+        - IaaPolicy:
+        - ResizeImage:
+            size: 224
+#         - RandCropImage:
+#             size: 224
+#         - RandFlipImage:
+#             flip_code: 1
+        - AutoAugment:
+        - NormalizeImage:
+            scale: 1.0/255.0
+            mean: [0.485, 0.456, 0.406]
+            std: [0.229, 0.224, 0.225]
+            order: ""
+        - RandomErasing:
+              EPSILON: 0.5
+              sl: 0.02
+              sh: 0.4
+              r1: 0.3
+              mean: [0., 0., 0.]
+
+    sampler:
+      name: DistributedBatchSampler
+      batch_size: 128
+      drop_last: False
+      shuffle: True
+    loader:
+      num_workers: 4
+      use_shared_memory: True
+
+  Eval:
+    dataset: 
+      name: CarAttriDataset
+      image_root: dataset/AICITY2022/data/
+      cls_label_path: label/val_color_aic22.txt
+      transform_ops:
+        - DecodeImage:
+            to_rgb: True
+            channel_first: False
+        - ResizeImage:
+            resize_short: 224
+        - CropImage:
+            size: 224
+        - NormalizeImage:
+            scale: 1.0/255.0
+            mean: [0.485, 0.456, 0.406]
+            std: [0.229, 0.224, 0.225]
+            order: ""
+    sampler:
+      name: DistributedBatchSampler
+      batch_size: 64
+      drop_last: False
+      shuffle: False
+    loader:
+      num_workers: 4
+      use_shared_memory: True
+
+Infer:
+  infer_imgs: ./deploy/images/0517_2715693311.jpg
+  batch_size: 10
+  transforms:
+    - DecodeImage:
+        to_rgb: True
+        channel_first: False
+    - ResizeImage:
+        resize_short: 224
+#     - CropImage:
+#         size: 224
+    - NormalizeImage:
+        scale: 1.0/255.0
+        mean: [0.485, 0.456, 0.406]
+        std: [0.229, 0.224, 0.225]
+        order: ""
+    - ToCHWImage:
+  PostProcess:
+    name: MultiLabelTopk
+    topk: 5
+    class_id_map_file: None
+
+Metric:
+  Train:
+  Eval:
+    - TopkAcc:
+        topk: [1]
