@@ -73,3 +73,22 @@ Take `dual_baseline_aug1` as an example:
 ```
 bash run/eval_only.sh
 ```
+
+## Ensemble 
+Change the `RESTORE_FROM` in your configuration file and extract the embeddings
+
+In addition, acquire the car and text features used in short-distance modeling by running the following code:
+
+1. Run `python3 scripts/get_location_info.py` to generate location information for each camera, which will be used in our post-processing stage.
+
+2. Run `python3 scripts/get_relation_info.py` to generate relationship features for test tracks, which will be used in our post-processing stage.
+
+```
+base run/submit.py
+```
+
+## Post processing
+
+Copy the `sim_mat.npy` file generated from previous step and paste it to `post_process_module/post_process/post-process-part1/sim_mat` folder.
+
+run the `post_process.py` files in 2 post procesing modules. See [post_processing module](post_process/post_process/README.md) for more details.
