@@ -1,4 +1,6 @@
-# AI City 2023: Comprehensive Visual Features and Pseudo Labeling for Robust Natural Language-based Vehicle Retrieval
+# [AI City 2023: Comprehensive Visual Features and Pseudo Labeling for Robust Natural Language-based Vehicle Retrieval](https://openaccess.thecvf.com/content/CVPR2023W/AICity/papers/Ngo_Comprehensive_Visual_Features_and_Pseudo_Labeling_for_Robust_Natural_Language-Based_CVPRW_2023_paper.pdf)
+
+The 3rd Place Solution to The 7th NVIDIA AI City Challenge (2023) Track 2: Tracked-Vehicle Retrieval by Natural Language Descriptions.
 
 <p align="center">
  <img src="figs/pipeline_redraws6.png" width="800">
