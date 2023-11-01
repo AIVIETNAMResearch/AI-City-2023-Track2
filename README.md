@@ -94,3 +94,17 @@ base run/submit.py
 Copy the `sim_mat.npy` file generated from previous step and paste it to `post_process_module/post_process/post-process-part1/sim_mat` folder.
 
 run the `post_process.py` files in 2 post procesing modules. See [post_processing module](post_process/post_process/README.md) for more details.
+
+## Citation
+If you use this method or this code in your research, please cite as:
+
+```
+@InProceedings{Ngo_2023_CVPR,
+    author    = {Ngo, Bach Hoang and Nguyen, Dat Thanh and Do-Tran, Nhat-Tuong and Thien, Phuc Pham Huy and An, Minh-Hung and Nguyen, Tuan-Ngoc and Hoang, Loi Nguyen and Nguyen, Vinh Dinh and Dinh, Vinh},
+    title     = {Comprehensive Visual Features and Pseudo Labeling for Robust Natural Language-Based Vehicle Retrieval},
+    booktitle = {Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) Workshops},
+    month     = {June},
+    year      = {2023},
+    pages     = {5409-5418}
+}
+```
